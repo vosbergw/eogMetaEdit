@@ -1,0 +1,10 @@
+[Plugin]
+Module=eogMetaEdit
+IAge=2
+Loader=python
+Name=MetaEditPlugin
+Icon=postr
+Description=My Test Plugin
+Authors=Wayne Vosberg <wayne.vosberg@mindtunnel.com>
+Copyright=Copyright © 2012 Creative Commons
+Website=about:mozilla
