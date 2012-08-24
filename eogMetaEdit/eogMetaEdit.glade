@@ -1,222 +1,318 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
-  <object class="GtkScrolledWindow" id="viewport1">
+  <object class="GtkScrolledWindow" id="eogMetaEdit">
     <property name="visible">True</property>
     <property name="can_focus">True</property>
+    <property name="shadow_type">in</property>
     <child>
-      <object class="GtkViewport" id="viewport2">
+      <object class="GtkViewport" id="eogMetaEdit_vp">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
+        <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+        <property name="border_width">8</property>
         <child>
-          <object class="GtkScrolledWindow" id="scrolledwindow1">
+          <object class="GtkGrid" id="grid1">
             <property name="visible">True</property>
             <property name="can_focus">True</property>
-            <property name="shadow_type">in</property>
+            <property name="can_default">True</property>
+            <property name="has_default">True</property>
+            <property name="receives_default">True</property>
+            <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
             <child>
-              <object class="GtkViewport" id="viewport3">
+              <object class="GtkLabel" id="dateLabel">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
+                <property name="halign">start</property>
+                <property name="margin_top">8</property>
+                <property name="label" translatable="yes">&lt;b&gt;Date:&lt;/b&gt;</property>
+                <property name="use_markup">True</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">1</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkComboBoxText" id="newDate">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                <property name="has_tooltip">True</property>
+                <property name="tooltip_markup" translatable="yes">Enter the date in &amp;quot;YYYY:MM:DD HH:MM:SS&amp;quot; format.</property>
+                <property name="tooltip_text" translatable="yes">Enter the date in "YYYY:MM:DD HH:MM:SS" format.</property>
+                <property name="hexpand">True</property>
+                <property name="has_entry">True</property>
+                <property name="entry_text_column">0</property>
+                <property name="id_column">1</property>
+                <signal name="changed" handler="Changed" swapped="no"/>
+                <signal name="key-press-event" handler="inKey" swapped="no"/>
+                <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                <child internal-child="entry">
+                  <object class="GtkEntry" id="newDateEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                    <property name="hexpand">True</property>
+                    <property name="max_length">20</property>
+                    <property name="invisible_char">•</property>
+                    <property name="width_chars">20</property>
+                    <property name="truncate_multiline">True</property>
+                    <property name="placeholder_text">YYYY:MM:DD HH:MM:SS</property>
+                    <signal name="changed" handler="Changed" swapped="no"/>
+                    <signal name="key-press-event" handler="inKey" swapped="no"/>
+                    <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                    <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">2</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="fileName">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">&lt;filename&gt;</property>
+                <attributes>
+                  <attribute name="style" value="italic"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">0</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="captionLabel">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="halign">start</property>
+                <property name="margin_top">8</property>
+                <property name="label" translatable="yes">&lt;b&gt;Caption:&lt;/b&gt;</property>
+                <property name="use_markup">True</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">3</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkComboBoxText" id="newCaption">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                <property name="has_tooltip">True</property>
+                <property name="tooltip_markup" translatable="yes">Photo caption to add</property>
+                <property name="tooltip_text" translatable="yes">Photo caption to add</property>
+                <property name="valign">start</property>
+                <property name="hexpand">True</property>
+                <property name="has_entry">True</property>
+                <property name="entry_text_column">0</property>
+                <property name="id_column">1</property>
+                <signal name="changed" handler="Changed" swapped="no"/>
+                <signal name="key-press-event" handler="inKey" swapped="no"/>
+                <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                <child internal-child="entry">
+                  <object class="GtkEntry" id="newCaptionEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                    <property name="valign">start</property>
+                    <property name="hexpand">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="placeholder_text">photo caption</property>
+                    <signal name="changed" handler="Changed" swapped="no"/>
+                    <signal name="key-press-event" handler="inKey" swapped="no"/>
+                    <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                    <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">4</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="keywordLabel">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="halign">start</property>
+                <property name="margin_top">8</property>
+                <property name="label" translatable="yes">&lt;b&gt;Keywords&lt;/b&gt;</property>
+                <property name="use_markup">True</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">5</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkComboBoxText" id="newKeyword">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                <property name="has_tooltip">True</property>
+                <property name="tooltip_markup" translatable="yes">Enter keywords seperated by commans or space.  Enter names as First_Last.</property>
+                <property name="tooltip_text" translatable="yes">Enter keywords seperated by commans or space.  Enter names as First_Last.</property>
+                <property name="hexpand">True</property>
+                <property name="has_entry">True</property>
+                <property name="entry_text_column">0</property>
+                <property name="id_column">1</property>
+                <signal name="changed" handler="Changed" swapped="no"/>
+                <signal name="key-press-event" handler="inKey" swapped="no"/>
+                <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                <child internal-child="entry">
+                  <object class="GtkEntry" id="newKeywordEntry">
+                    <property name="can_focus">True</property>
+                    <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                    <property name="invisible_char">•</property>
+                    <property name="placeholder_text">Keyword, i.e. First_Last</property>
+                    <signal name="changed" handler="Changed" swapped="no"/>
+                    <signal name="key-press-event" handler="inKey" swapped="no"/>
+                    <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                    <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">6</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkBox" id="box1">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="margin_top">16</property>
+                <property name="homogeneous">True</property>
                 <child>
-                  <object class="GtkGrid" id="grid1">
+                  <object class="GtkButton" id="revertButton">
+                    <property name="label" translatable="yes">Revert</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <property name="has_tooltip">True</property>
+                    <property name="tooltip_markup" translatable="yes">&lt;b&gt;Revert&lt;/b&gt; will set the displayed values back to what is currently in the file.
+</property>
+                    <property name="use_action_appearance">False</property>
+                    <signal name="notify" handler="revertNotify" swapped="no"/>
+                    <signal name="clicked" handler="revertNotify" object="viewport2" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkButton" id="commitButton">
+                    <property name="label" translatable="yes">Commit</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <property name="has_tooltip">True</property>
+                    <property name="tooltip_markup" translatable="yes">&lt;b&gt;Commit&lt;/b&gt; will modify the file as follows:
+
+Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal and Exif.Photo.DateTimeDigitized will be set to the value shown.  
+Xmp.exif.DateTimeOriginal, Xmp.dc.date, Iptc.Application2.DateCreated and Iptc.Application2.TimeCreated wil be removed from the file.
+
+Iptc.Application2.Caption will be set to the value shown.  
+Exif.Image.ImageDescription, Xmp.dc.description and Xmp.acdsee.caption  will be removed from the file.   
+
+Iptc.Application2.Keywords will be set to the value shown.
+Exif.Photo.UserComment will be removed from the file
+</property>
+                    <property name="use_action_appearance">False</property>
+                    <signal name="clicked" handler="commitNotify" object="viewport2" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">7</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkScrolledWindow" id="scrolledwindow1">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="margin_left">4</property>
+                <property name="margin_right">4</property>
+                <property name="margin_top">16</property>
+                <property name="margin_bottom">8</property>
+                <property name="hexpand">True</property>
+                <property name="vexpand">True</property>
+                <property name="shadow_type">in</property>
+                <child>
+                  <object class="GtkViewport" id="viewport1">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
+                    <property name="margin_left">8</property>
+                    <property name="margin_right">8</property>
+                    <property name="margin_top">8</property>
+                    <property name="margin_bottom">8</property>
+                    <property name="hexpand">True</property>
+                    <property name="vexpand">True</property>
                     <child>
-                      <object class="GtkLabel" id="dateLabel">
+                      <object class="GtkLabel" id="disclaimer">
                         <property name="visible">True</property>
                         <property name="can_focus">False</property>
+                        <property name="double_buffered">False</property>
                         <property name="halign">start</property>
-                        <property name="margin_top">8</property>
-                        <property name="label" translatable="yes">&lt;b&gt;Date:&lt;/b&gt;</property>
-                        <property name="use_markup">True</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">1</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkComboBoxText" id="newDate">
-                        <property name="visible">True</property>
-                        <property name="can_focus">True</property>
-                        <property name="has_tooltip">True</property>
-                        <property name="tooltip_text" translatable="yes">Enter the date in "YYYY:MM:DD HH:MM:SS" format.</property>
-                        <property name="hexpand">True</property>
-                        <property name="has_entry">True</property>
-                        <property name="entry_text_column">0</property>
-                        <property name="id_column">1</property>
-                        <child internal-child="entry">
-                          <object class="GtkEntry" id="newDateEntry">
-                            <property name="can_focus">True</property>
-                            <property name="hexpand">True</property>
-                            <property name="max_length">20</property>
-                            <property name="invisible_char">•</property>
-                            <property name="width_chars">20</property>
-                            <property name="truncate_multiline">True</property>
-                            <property name="placeholder_text">YYYY:MM:DD HH:MM:SS</property>
-                          </object>
-                        </child>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">2</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="fileName">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="label" translatable="yes">&lt;filename&gt;</property>
-                        <attributes>
-                          <attribute name="style" value="italic"/>
-                        </attributes>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">0</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="captionLabel">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="halign">start</property>
-                        <property name="margin_top">8</property>
-                        <property name="label" translatable="yes">&lt;b&gt;Caption:&lt;/b&gt;</property>
-                        <property name="use_markup">True</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">3</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkComboBoxText" id="newCaption">
-                        <property name="visible">True</property>
-                        <property name="can_focus">True</property>
-                        <property name="has_tooltip">True</property>
-                        <property name="tooltip_text" translatable="yes">Photo caption to add</property>
+                        <property name="valign">start</property>
+                        <property name="margin_left">4</property>
+                        <property name="margin_right">4</property>
+                        <property name="margin_top">4</property>
+                        <property name="margin_bottom">4</property>
                         <property name="hexpand">True</property>
                         <property name="vexpand">True</property>
-                        <property name="has_entry">True</property>
-                        <property name="entry_text_column">0</property>
-                        <property name="id_column">1</property>
-                        <child internal-child="entry">
-                          <object class="GtkEntry" id="newCaptionEntry">
-                            <property name="can_focus">False</property>
-                            <property name="hexpand">True</property>
-                            <property name="vexpand">True</property>
-                            <property name="placeholder_text">photo caption</property>
-                          </object>
-                        </child>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">4</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkLabel" id="keywordLabel">
-                        <property name="visible">True</property>
-                        <property name="can_focus">True</property>
-                        <property name="halign">start</property>
-                        <property name="margin_top">8</property>
-                        <property name="label" translatable="yes">&lt;b&gt;Keywords&lt;/b&gt;</property>
+                        <property name="label" translatable="yes">&lt;b&gt;WARNING!!!&lt;/b&gt;  No validation of any sort is done on the values entered above.  If &lt;a href="http://tilloy.net/dev/pyexiv2/"&gt;pyexiv2&lt;/a&gt; accepts the value it will be set.  It is YOUR responsibility to back up YOUR files before making any changes!</property>
                         <property name="use_markup">True</property>
+                        <property name="wrap">True</property>
+                        <property name="selectable">True</property>
+                        <property name="track_visited_links">False</property>
                       </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">5</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkComboBoxText" id="newKeyword">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="hexpand">True</property>
-                        <property name="vexpand">True</property>
-                        <property name="has_entry">True</property>
-                        <property name="entry_text_column">0</property>
-                        <property name="id_column">1</property>
-                        <child internal-child="entry">
-                          <object class="GtkEntry" id="newKeywordEntry">
-                            <property name="can_focus">True</property>
-                            <property name="tooltip_text" translatable="yes">Enter keywords here, separated by comma or space.</property>
-                            <property name="hexpand">True</property>
-                            <property name="vexpand">True</property>
-                            <property name="placeholder_text">keyword list, sperarated by comma or space</property>
-                          </object>
-                        </child>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">6</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkBox" id="box1">
-                        <property name="visible">True</property>
-                        <property name="can_focus">False</property>
-                        <property name="margin_top">16</property>
-                        <property name="homogeneous">True</property>
-                        <child>
-                          <object class="GtkButton" id="revertButton">
-                            <property name="label" translatable="yes">Revert</property>
-                            <property name="use_action_appearance">False</property>
-                            <property name="visible">True</property>
-                            <property name="can_focus">True</property>
-                            <property name="receives_default">True</property>
-                            <property name="use_action_appearance">False</property>
-                            <signal name="notify" handler="revertNotify" swapped="no"/>
-                            <signal name="clicked" handler="revertNotify" object="viewport2" swapped="no"/>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">0</property>
-                          </packing>
-                        </child>
-                        <child>
-                          <object class="GtkButton" id="commitButton">
-                            <property name="label" translatable="yes">Commit</property>
-                            <property name="use_action_appearance">False</property>
-                            <property name="visible">True</property>
-                            <property name="can_focus">True</property>
-                            <property name="receives_default">True</property>
-                            <property name="use_action_appearance">False</property>
-                            <signal name="clicked" handler="commitNotify" object="viewport2" swapped="no"/>
-                          </object>
-                          <packing>
-                            <property name="expand">False</property>
-                            <property name="fill">False</property>
-                            <property name="position">1</property>
-                          </packing>
-                        </child>
-                      </object>
-                      <packing>
-                        <property name="left_attach">0</property>
-                        <property name="top_attach">7</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
                     </child>
                   </object>
                 </child>
               </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">8</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
             </child>
           </object>
         </child>
