@@ -6,6 +6,7 @@ all: ${DEST}/eogMetaEdit.py ${DEST}/eogMetaEdit.plugin ${DEST}/eogMetaEdit/eogMe
 
 ${DEST}/eogMetaEdit.py: eogMetaEdit.py
 	install eogMetaEdit.py ${DEST}
+	epydoc --html -v eogMetaEdit.py -o docs
 
 ${DEST}/eogMetaEdit.plugin: eogMetaEdit.plugin
 	install eogMetaEdit.plugin ${DEST}
