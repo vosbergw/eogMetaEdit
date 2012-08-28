@@ -8,10 +8,8 @@ tags:
 
 * Original Photo Date:
 
-		+ Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal and Exif.Photo.DateTimeDigitized 
-		will be set to the specified date.
-		+ Xmp.exif.DateTimeOriginal, Xmp.dc.date, Iptc.Application2.DateCreated and 
-		Iptc.Application2.TimeCreated will be removed.
+		+ Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal and Exif.Photo.DateTimeDigitized will be set to the specified date.
+		+ Xmp.exif.DateTimeOriginal, Xmp.dc.date, Iptc.Application2.DateCreated and Iptc.Application2.TimeCreated will be removed.
 
 * Captions:
 
