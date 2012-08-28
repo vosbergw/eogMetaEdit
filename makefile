@@ -1,4 +1,6 @@
 
+# the default operation for this makefile is to copy the eogMetaEdit plugin to the
+# users personal plugin directory:  ~/.config/eog/plugins (for Ubuntu 12.04)
 
 DEST=~/.config/eog/plugins
 
@@ -6,7 +8,6 @@ all: ${DEST}/eogMetaEdit.py ${DEST}/eogMetaEdit.plugin ${DEST}/eogMetaEdit/eogMe
 
 ${DEST}/eogMetaEdit.py: eogMetaEdit.py
 	install eogMetaEdit.py ${DEST}
-	epydoc --html -v eogMetaEdit.py -o docs
 
 ${DEST}/eogMetaEdit.plugin: eogMetaEdit.plugin
 	install eogMetaEdit.plugin ${DEST}
