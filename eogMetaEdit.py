@@ -22,6 +22,7 @@ from os.path import join, basename
 from urlparse import urlparse
 import pyexiv2
 import re
+import time
 from string import strip
 #import pdb
 
@@ -248,8 +249,11 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				#print "removing [",k,"]"
 				self.metadata.__delitem__(k)  
 				
+
+		curImage = Eog.ThumbView.get_first_selected_image(self.thumbview)
 		self.metadata.write()
-		self.fileChanged(self.thumbview, self)
+		Eog.Image.file_changed(curImage)
+
 		return True
 		
 
@@ -261,6 +265,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.fileChanged(self.thumbview, self)
 		#self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
 		#self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+
 		return True
 
 
@@ -268,7 +273,11 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	def	fileChanged(thumb, self):
 		'''The file has changed.  Load the new metadata and update my dialog accordingly.  The Revert button will also call this function'''
 	
-		self.currentName = urlparse(Eog.ThumbView.get_first_selected_image(thumb).get_uri_for_display()).path
+		try:
+			self.currentName = urlparse(Eog.ThumbView.get_first_selected_image(thumb).get_uri_for_display()).path
+		except AttributeError:
+			return False
+			
 		self.fileName.set_label(basename(self.currentName))
 		
 		self.metadata = pyexiv2.ImageMetadata(self.currentName)
