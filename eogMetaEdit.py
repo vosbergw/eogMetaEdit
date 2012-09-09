@@ -17,13 +17,14 @@ along with eogMetaEdit.  If not, see <http://www.gnu.org/licenses/>.
 Copyright 2012 Wayne Vosberg <wayne.vosberg@mindtunnel.com>
 '''
 
-from gi.repository import GObject, Gtk, Eog, PeasGtk
+from gi.repository import GObject, Gtk, Gdk, Eog, PeasGtk
 from os.path import join, basename
 from urlparse import urlparse
 import pyexiv2
 import re
 import time
 from string import strip
+#import sys
 #import pdb
 
 '''
@@ -69,6 +70,7 @@ def showChildren(A,pref=""):
 class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 
 	window = GObject.property(type=Eog.Window)	
+	Debug = False
 	
 	def __init__(self):
 		GObject.Object.__init__(self)
@@ -78,13 +80,28 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		'''activate plugin - adds my dialog to the Eog Sidebar'''
 		
 		# need the sidebar to add my dialog to and the thumbview to track when the file changes.
-		self.sidebar = Eog.Window.get_sidebar(self.window)
-		self.thumbview = Eog.Window.get_thumb_view(self.window)
+		
+		self.sidebar = self.window.get_sidebar()
+		self.thumbview = self.window.get_thumb_view()
+		#self.scrollview = self.window.get_view()
+		
+		#self.image = Eog.Window.get_image(self.window)
+		#self.scrollview = Eog.Window.get_view(self.window)
+		
+		
+		self.curImage = None
+		#self.curName = None
+		#self.oldImage = None
+		#self.oldName = None
+		self.changedImage = None
+		self.ignoreChange = 0
+		#self.fixME = False
 		
 		# build my dialog
 		builder = Gtk.Builder()
 		builder.add_from_file(join(self.plugin_info.get_data_dir(),"eogMetaEdit.glade"))
 		pluginDialog = builder.get_object('eogMetaEdit')
+		self.isChangedDialog = builder.get_object('isChangedDialog')
 		
 		
 		# save my widgets		
@@ -100,8 +117,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.newKeywordEntry = builder.get_object("newKeywordEntry")
 		
 		self.commitButton = builder.get_object('commitButton')
-		self.revertButton = builder.get_object('revertButton')  
-		
+		self.revertButton = builder.get_object('revertButton') 
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.metaChanged = False
 		
 		# set up my callbacks
 		
@@ -131,8 +150,6 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		self.cb_ids['selection-changed'] = {}
 		self.cb_ids['selection-changed'][self.thumbview] = self.thumbview.connect('selection-changed', self.fileChanged, self)
-					
-		#self.state_handler_id = self.window.connect('window-state-event', self.state_changed_cb, self)
 		
 		# finally, add my dialog to the sidebar
 		Eog.Sidebar.add_page(self.sidebar,"Metadata Editor", pluginDialog)
@@ -148,7 +165,8 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				W.disconnect(id)
 				
 		self.window.disconnect(self.window_keyIn_id)
-	
+
+
 
 	# The callback functions are done statically to avoid causing additional
 	# references on the window property causing eog to not quit correctly.
@@ -191,28 +209,32 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 
 	@staticmethod
 	def Changed(plugin,self):
-		'''one of the comboboxes has changed.  enable the revert and commit buttons'''
+		'''one of the comboboxes has changed.  enable the revert and commit buttons and save the current image in changedImage'''
 		
 		if self.commitButton.get_state() == Gtk.StateType.INSENSITIVE:
 			self.commitButton.set_state(Gtk.StateType.NORMAL)
 			self.revertButton.set_state(Gtk.StateType.NORMAL)
+			#self.changedImage = self.window.get_image()
+			self.changedImage = self.thumbview.get_first_selected_image()
+			#self.changedImage = self.scrollview.get_property('image')
+			if self.changedImage != None:
+				if self.Debug:
+					print 'marking %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
+				self.metaChanged = True
 		
 		return True
-	
+			
+			
 			
 	@staticmethod
 	def commitNotify(plugin, self):
 		'''commit the changes to the file'''
 		
-		#print 'commit ',self.currentName
+		#print 'commit ',self.curName
 		
 		saveDate = self.newDate.get_active_text()
 		saveCaption = self.newCaption.get_active_text()
 		saveKeyword = self.newKeyword.get_active_text()
-		
-		#print '	date: [%s]'%saveDate
-		#print ' caption: [%s]'%saveCaption
-		#print 'keywords: [%s]'%saveKeyword
 		
 		DTvars = [ 'Exif.Photo.DateTimeOriginal', 'Exif.Image.DateTimeOriginal', 'Exif.Photo.DateTimeDigitized' ]
 		DTrem = [ 'Xmp.exif.DateTimeOriginal', 'Xmp.dc.date', 'Iptc.Application2.DateCreated', 'Iptc.Application2.TimeCreated' ]
@@ -248,11 +270,26 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			if k in self.metadata.exif_keys+self.metadata.iptc_keys+self.metadata.xmp_keys:
 				#print "removing [",k,"]"
 				self.metadata.__delitem__(k)  
-				
-
-		curImage = Eog.ThumbView.get_first_selected_image(self.thumbview)
+		
 		self.metadata.write()
-		Eog.Image.file_changed(curImage)
+		
+		# reset the comboboxes to what was just written
+		
+		#if self.thumbImage != None:
+		#	self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
+		#elif self.curImage != None:
+		#	self.loadMeta(urlparse(self.curImage.get_uri_for_display()).path)
+		if self.Debug:
+			print 'after commit:'
+			self.showImages()
+			
+		#self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)		
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)		
+		self.metaChanged = False
+		#if self.changedImage != self.thumbImage:
+		#	self.changedImage.file_changed()
+		self.changedImage = None
 
 		return True
 		
@@ -262,41 +299,188 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	def revertNotify(plugin, self):
 		'''Revert the 3 comboboxes to the values in the file itself and set the buttons back to insensitive'''
 		
-		self.fileChanged(self.thumbview, self)
-		#self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		#self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		if self.changedImage == None:
+			print 'warning: revert selected but nothing to revert to!'
+			self.showImages()
+		else:
+			self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)
+			self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.metaChanged = False
+			self.changedImage = None
 
 		return True
-
-
+	
+	def showImages(self):
+		'''debug function: dump the current images paths'''
+		
+		if self.curImage == None:
+			print 'current: None'
+		else:
+			print 'current: ',urlparse(self.curImage.get_uri_for_display()).path
+		try:
+			print 'win says: ',urlparse(self.window.get_image().get_uri_for_display()).path
+		except:
+			print 'none'
+		if self.changedImage == None:
+			print 'changed: None'
+		else:
+			print 'changed: ',urlparse(self.changedImage.get_uri_for_display()).path
+		if self.thumbImage == None:	
+			print 'thumb: None'
+		else:
+			print 'thumb: ',urlparse(self.thumbImage.get_uri_for_display()).path
+		try:
+			print 'thumb says: ',urlparse(self.thumbview.get_first_selected_image().get_uri_for_display()).path
+		except:
+			print 'none'
+		
+		
 	@staticmethod
 	def	fileChanged(thumb, self):
 		'''The file has changed.  Load the new metadata and update my dialog accordingly.  The Revert button will also call this function'''
-	
-		try:
-			self.currentName = urlparse(Eog.ThumbView.get_first_selected_image(thumb).get_uri_for_display()).path
-		except AttributeError:
-			return False
-			
-		self.fileName.set_label(basename(self.currentName))
+		CANCEL=2
+		NO=1
+		YES=0
 		
-		self.metadata = pyexiv2.ImageMetadata(self.currentName)
+		
+		
+		self.curImage = self.window.get_image()
+		#self.curImage = Eog.Window.get_image(self.window)
+		#print 'window.get_image: ',self.window.get_image()
+		#print dir(self.scrollview)
+		#self.viewImage = self.scrollview.get_property('image')
+		self.thumbImage = self.thumbview.get_first_selected_image()
+		
+		if self.Debug:
+			print '\n\nfile changed ----------------------------------------------'
+			self.showImages()		
+		
+		if self.ignoreChange < 0:  # check to see if this callback is from a canceled file change
+			# let other callbacks run
+			if self.Debug:
+				print 'ignoring change (%d)'%self.ignoreChange
+			if self.ignoreChange == -1 and self.thumbImage != self.changedImage:
+				self.ignoreChange -= 1
+				self.thumbview.set_current_image(self.changedImage,True)
+				return False
+			
+			self.ignoreChange += 1
+			#if self.thumbImage != self.changedImage and self.thumbImage != None:
+			#	#self.ignoreChange -= 1
+			#	print 'resetting thumb again %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
+			#	self.thumbview.set_current_image(self.changedImage,True)
+			#	return True
+			#self.thumbview.unselect_all()
+			#self.thumbview.emit_stop_by_name('button-press-event')
+			#self.thumbview.emit(Gtk.EventButton)
+			#if self.fixME:
+			#	self.fixME = False
+			#	self.ignoreChange -= 1
+			#	print 'resetting again %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
+			#	self.thumbview.set_current_image(self.changedImage,True)
+								
+			return False	
+		elif self.metaChanged:
+			Event = Gtk.get_current_event()
+			if self.Debug:
+				print '\n\n---------------------------------------------------'
+				print 'event: %s (%s) state: %s'%(Event.type,Event.get_click_count(),Event.get_state())
+				print 'device: %s'%Event.get_device()
+				print 'source: %s'%Event.get_source_device()
+				print 'button: ',Event.get_button()
+				print 'keycode: ',Event.get_keycode()
+				print 'keyval: ',Event.get_keyval()
+				print 'screen: ',Event.get_screen()
+				print 'window stat: ',Event.window_state
+			
+			if Event.type == Gdk.EventType.BUTTON_PRESS:
+				# we got here by clicking a thumbnail in the thumb navigator.  throw away the
+				# release event or we will be left dragging the thumbnail after the dialog closes
+				# (not a critical error, but forces you to click an extra time in the thumb nav
+				# to release the drag
+				self.thumbview.emit('button-release-event', Event)
+				#E='Mouse'
+			#elif Event.type == Gdk.EventType.KEY_PRESS:
+				# got here by the arrow keys, no special handling seems to be required
+				#E='Arrow'
+			#elif Event.type == Gdk.EventType.BUTTON_RELEASE:
+				#E='Toolbar'
+
+				
+				# got here by the toolbar button (next/previous)
+				# if we treat this the same as the BUTTON_PRESS we are left with 2 images selected
+				# in nav windows with the wrong one displayed.  selecting the arrow again will cause
+				# a crash (glibc: eog double free or corruption)
+				#self.fixME = True
+				#pdb.set_trace()
+				#Event.free()
+				#self.thumbview.unselect_all()
+
+			
+			self.result = self.isChangedDialog.run()
+			self.isChangedDialog.hide()
+
+			if self.result == CANCEL or self.result < 0:
+				# stay on the current file.  
+				if self.changedImage != None:
+					if self.Debug:
+						print 'resetting thumb to %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
+					# ignore this and the next file changed callback so that we
+					# revert to the previous photo without modifying the comboboxes
+					self.ignoreChange = -2
+					self.thumbview.set_current_image(self.changedImage,True)
+					#self.scrollview.set_property('image',self.changedImage)
+					
+					return False
+				else:
+					print 'NOTHING TO REVERT TO!!!'
+					self.showImages()
+				
+			elif self.result == YES:
+				# save the changes, as a result of the change this function will be 
+				# called again with the commit button state INSENSITIVE
+				self.commitButton.clicked()
+				#return False
+			else:
+				# no was pushed.  just continue on with the normal file change
+				self.metaChanged = False
+				#return True		
+		
+		#if self.curImage != None:
+		#	print 'loading current meta:',urlparse(self.curImage.get_uri_for_display()).path
+		#	self.loadMeta(urlparse(self.curImage.get_uri_for_display()).path)
+		if self.thumbImage != None:
+			if self.Debug:
+				print 'loading thumb meta:',urlparse(self.thumbImage.get_uri_for_display()).path
+			self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
+		else:
+			if self.Debug:
+				print 'no meta to load!'
+				self.showImages()
+			return False
+		
+		# freshly set comboboxes, disable commit and revert
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		#self.changedImage = None
+		self.metaChanged = False
+
+		# return False to let any other callbacks execute as well
+		return False
+
+
+	
+	def loadMeta(self, filePath):
+		'''set the comboboxes to the current files data'''
+		self.fileName.set_label(basename(filePath))
+		
+		self.metadata = pyexiv2.ImageMetadata(filePath)
 		self.metadata.read()		
 		
-		newDates = self.loadDates()
-		#print '%d new dates'%len(newDates)
-		#for l in range(len(newDates)):
-		#	print 'newDates[%d]:[%s]'%(l,newDates[l])
-			
+		newDates = self.loadDates()			
 		newCaptions = self.loadCaptions()
-		#print '%d new captions'%len(newCaptions)
-		#for l in range(len(newCaptions)):
-		#	print 'newCaptions[%d]:[%s]'%(l,newCaptions[l])
-			
 		newKeywords = self.loadKeywords()
-		#print '%d new keywords'%len(newKeywords)
-		#for l in range(len(newKeywords)):
-		#	print 'newKeywords[%d]:[%s]'%(l,newKeywords[l])
 
 		# set the combobox to no active selection
 		self.newDate.set_active(-1)
@@ -322,8 +506,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		# clear the combobox text entry as well
 		self.newDateEntry.set_text('')
 		self.newCaptionEntry.set_text('')
-		self.newKeywordEntry.set_text('')
-		
+		self.newKeywordEntry.set_text('')		
 		
 		# and finally set the new values and make them active
 		for t in newDates:
@@ -331,14 +514,11 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.newDate.append_text(t)
 			except:
 				self.newDate.append_text(t[0])
-		self.newDate.set_active(0)
-		
+		self.newDate.set_active(0)		
 		
 		for c in newCaptions:
 			try:
 				self.newCaption.append_text(c)
-				#except KeyError:
-				#captionEntry.append_text(c['x-default'])
 			except:
 				try:
 					self.newCaption.append_text(c[0])
@@ -346,27 +526,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 					self.newCaption.append_text(c['x-default'])
 				except:
 					print 'error:',sys.exc_info()
-		self.newCaption.set_active(0)
-		
-		
+		self.newCaption.set_active(0)	
 		
 		for k in newKeywords:  
 			try:  
 				self.newKeyword.append_text(k)
 			except:
 				self.newKeyword.append_text(k[0])
-				#if len(keywordEntry.get_model()) < 1:
-				#keywordEntry.append_text('<keyword list>')
 		self.newKeyword.set_active(0)
-		
-		# since we have just set the values from the file, disable the Revert and Commit buttons
-		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
-		
-		# return False to let any other callbacks execute as well
-		return False
-	
-		
+
+			
 	def loadDates(self):
 		'''
 		see http://exiv2.org/tags.html
@@ -432,27 +601,5 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				myKeywords.append(kk)
 				#myKeywords.append(self.metadata[k].raw_value)
 		return myKeywords	
-	
-	
-	
-	#@staticmethod
-	#def state_changed_cb(window, event, self):
-	#	mode = self.window.get_mode()
-	#	#print '\n>>>>>>>>>>>>>',
-	#	#print ' mode:',mode.value_name,
-	#	#try:
-	#		print 'image:',self.window.get_image().get_uri_for_display()
-	#	except:
-	#		print ''
-				
-		#try:
-		#	print "\n\nfile:",self.window.get_image().get_uri_for_display()
-		#except:
-		#	try:
-		#		print "\n\nuri:",Eog.Image.get_uri_for_display(self.window.get_image())
-		#	except:
-		#		pass
-		#self.show_kids(self.window)
-
 
 
