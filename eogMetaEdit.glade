@@ -171,8 +171,8 @@
                 <property name="can_focus">True</property>
                 <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
                 <property name="has_tooltip">True</property>
-                <property name="tooltip_markup" translatable="yes">Enter keywords seperated by commans or space.  Enter names as First_Last.</property>
-                <property name="tooltip_text" translatable="yes">Enter keywords seperated by commans or space.  Enter names as First_Last.</property>
+                <property name="tooltip_markup" translatable="yes">Enter keywords seperated by commas or space.  Enter names as First_Last.</property>
+                <property name="tooltip_text" translatable="yes">Enter keywords seperated by commas or space.  Enter names as First_Last.</property>
                 <property name="hexpand">True</property>
                 <property name="has_entry">True</property>
                 <property name="entry_text_column">0</property>

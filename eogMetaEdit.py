@@ -289,9 +289,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		# keyword variables
 		for k in self.KWvars:
+			newKW = ' '.join(re.split(',\s+',saveKeyword)).split()
 			if self.Debug:
-				print "update [",k,"] to ",re.split('\W+',saveKeyword)
-			self.metadata.__setitem__(k,re.split('\W+',saveKeyword))
+				print "update [",k,"] to ",newKW
+			self.metadata.__setitem__(k,newKW)
 		for k in self.KWrem:
 			if k in self.all_keys:
 				if self.Debug:
