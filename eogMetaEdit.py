@@ -33,9 +33,36 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	window = GObject.property(type=Eog.Window)	
 	Debug = False
 	
+	# definition of metadata to manage. DT=date/time, CA=caption
+	# and KW=keyword
+	#
+	# on load, existing XXvars and XXrem variables will be added
+	# to the combobox pulldown.
+	# on save, XXvars variables will all be set to the value in
+	# the combobox and all XXrem variables will be removed from
+	# the file
+	#
+	DTvars = [	'Exif.Photo.DateTimeOriginal',
+				'Exif.Image.DateTimeOriginal', 
+				'Exif.Photo.DateTimeDigitized',
+				'Exif.Image.DateTime' ]
+	DTrem  = [	'Xmp.exif.DateTimeOriginal',
+				'Xmp.dc.date',
+				'Iptc.Application2.DateCreated',
+				'Iptc.Application2.TimeCreated' ]
+	CAvars = [	'Exif.Image.ImageDescription']
+	CArem  = [	'Iptc.Application2.Caption', 
+				'Xmp.dc.description', 
+				'Xmp.acdsee.caption' ]
+	KWrem  = [	'Exif.Photo.UserComment' ]
+	KWvars = [	'Iptc.Application2.Keywords' ]  
+		
+		
+		
 	def __init__(self):
 		GObject.Object.__init__(self)
 		
+
 
 	def do_activate(self):
 		'''Activate the plugin - adds my dialog to the Eog Sidebar'''
@@ -52,7 +79,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		# the EogImage whose metadata has been modified
 		self.changedImage = None
 		# flag for selection_changed_cb to note when we made the change
-		self.ignoreChange = 0
+		self.ignoreChange = False
 		
 		# build my dialog
 		builder = Gtk.Builder()
@@ -62,7 +89,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.isChangedDialog = builder.get_object('isChangedDialog')
 		
 		
-		# save my widgets		
+		# my widgets		
 		self.fileName = builder.get_object("fileName")
 		
 		self.newDate = builder.get_object("newDate")
@@ -82,6 +109,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
 		self.metaChanged = False
 		
+		# these lists are for convenience later
 		self.combos =  [	self.newDate, self.newCaption, self.newKeyword ]
 		self.entries = [	self.newDateEntry, self.newCaptionEntry, 
 							self.newKeywordEntry ]
@@ -95,16 +123,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		# hopefully making it easier to remove them without forgetting any.
 		
 		# the key-press-event callback will only be enabled when one of my 
-		# comboboxes has focus
-		self.cb_ids = {}
-		self.cb_ids['key-press-event'] = {}
+		# comboboxes has focus.  this allows me to block the main window
+		# from acting on any shortcut keys (as defined in eog-window.c
+		# function eog_window_key_press.
 		
+		self.cb_ids = {}
+		self.cb_ids['key-press-event'] = {}		
 		self.cb_ids['key-press-event'][self.window] = \
 			self.window.connect('key-press-event', self.key_press_event_cb)
-		
-		self.window.handler_block(self.cb_ids['key-press-event'][self.window])		
-		
-		
+		# block this callback initially - it is only enabled when I want focus
+		self.window.handler_block(self.cb_ids['key-press-event'][self.window])					
 		
 		for S in 'focus-in-event','focus-out-event':
 			if not self.cb_ids.has_key(S):
@@ -116,7 +144,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		for S in 'changed',:
 			if not self.cb_ids.has_key(S):
 				self.cb_ids[S]={}
-			for W in self.newDate, self.newCaption, self.newKeyword:
+			for W in self.combos:
 				self.cb_ids[S][W] = W.connect(S, self.combo_changed_cb, self)
 		
 		self.cb_ids['clicked'] = {}
@@ -147,24 +175,24 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	# The callback functions are done statically to avoid causing additional
 	# references on the window property causing eog to not quit correctly.
 
+
+
 	@staticmethod
-	def focus_event_cb(plugin,event,win,id):
+	def focus_event_cb(widget, event, win, id):
 		'''
 		Process the change of focus for the comboboxes.  If the combobox has 
 		focus, unblock the key-press-event callback on the main EogWindow so 
-		that I can process the key presses.
-		
-		Here, plugin is the combobox this callback is set for (focus-in-event 
-		and focus-out-event
+		that the combobox can get the key-press and not eog_window_key_press.
 		
 		'''
 		
-		if plugin.has_focus():
+		if widget.has_focus():
 			win.handler_unblock(id)
 		else:
 			win.handler_block(id)
 		
-		return True
+		return False
+	
 	
 	
 	@staticmethod
@@ -174,12 +202,12 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		for the EogWindow key-press-event.  I expected to be able to set this 
 		callback for the comboboxes themselves, but no matter what I tried 
 		the signal went to the main window first which caused me to miss any 
-		keys acted on by the main EogWindow.  Not sure if this is a bug or if 
-		I was doing something wrong but I got it working by setting the 
-		callback here to perform the default key_press_event for the comboxbox 
-		with focus and then throwing away the event.  This callback is only 
-		enabled when one of the comboboxes has focus - otherwise the 
-		key-press-event goes to the EogWindow as normal.
+		keys acted on by eog_window_key_press in eog-window.c.  Not sure if 
+		this is a bug or if I was doing something wrong but I got it working 
+		by intercepting the event here and then throwing away the event.  
+		
+		This callback is only enabled when one of the comboboxes has focus - 
+		otherwise the key-press-event goes to eog_window_key_press as normal.
 		
 		'''
 		
@@ -204,18 +232,21 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			self.commitButton.set_state(Gtk.StateType.NORMAL)
 			self.revertButton.set_state(Gtk.StateType.NORMAL)
 			self.metaChanged = True
-			#if self.changedImage == None:
+			# make sure changedImage is set
 			if self.thumbview.get_first_selected_image() != None:
 				self.changedImage = self.thumbview.get_first_selected_image()
 			elif self.changedImage == None:
 				self.showImages()
-				raise ValueError('combo_changed_cb called but both '+\
+				raise ValueError('combo_changed_cb but both '+\
 						'changedImage and thumbImage are None!')
 			
 			if self.Debug:
-				print '\n--',self.showImages(),'\n--'
-				print 'marking %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
+				print '\ncombo_changed_cb-------\n',self.showImages()
+				print 'marking %s (%s)'%(self.changedImage,urlparse(\
+						self.changedImage.get_uri_for_display()).path)
+				print '----------'
 		
+		# return True -- default callback isn't needed
 		return True
 			
 			
@@ -225,71 +256,63 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		'''Commit the changes to the file'''
 		
 		if self.Debug:
-			print 'commit ',urlparse(self.changedImage.get_uri_for_display()).path
+			print '\ncommit: ',\
+				urlparse(self.changedImage.get_uri_for_display()).path
 		
 		saveDate = self.newDate.get_active_text()
 		saveCaption = self.newCaption.get_active_text()
 		saveKeyword = self.newKeyword.get_active_text()
 		
-		DTvars = [	'Exif.Photo.DateTimeOriginal',
-					'Exif.Image.DateTimeOriginal',
-					'Exif.Photo.DateTimeDigitized' ]
-		DTrem = [	'Xmp.exif.DateTimeOriginal',
-					'Xmp.dc.date',
-					'Iptc.Application2.DateCreated',
-					'Iptc.Application2.TimeCreated' ]
+		# set the vars in XXvars and remove the ones in XXrem
 		
-		for k in DTvars:
+		# date/time variables
+		for k in self.DTvars:
 			if self.Debug:
 				print "update [",k,"] to [",saveDate,"]"
 			self.metadata.__setitem__(k,saveDate)
-		for k in DTrem:
+		for k in self.DTrem:
 			if k in self.all_keys:
 				if self.Debug:
 					print "removing [",k,"]"
 				self.metadata.__delitem__(k)
-				
-		CAvars = [	'Iptc.Application2.Caption' ]
-		CArem = [	'Exif.Image.ImageDescription',
-					'Xmp.dc.description',
-					'Xmp.acdsee.caption' ]
-			   
-		for k in CAvars:
+		
+		# caption variables	   
+		for k in self.CAvars:
 			if self.Debug:
 				print "update [",k,"]  to [",saveCaption,"]"
 			self.metadata.__setitem__(k,[saveCaption])
-		for k in CArem:
+		for k in self.CArem:
 			if k in self.all_keys:
 				if self.Debug:
 					print "removing [",k,"]"
 				self.metadata.__delitem__(k)		
-				
-		KWrem = [	'Exif.Photo.UserComment' ]
-		KWvars = [	'Iptc.Application2.Keywords' ]  
 		
-		for k in KWvars:
+		# keyword variables
+		for k in self.KWvars:
 			if self.Debug:
 				print "update [",k,"] to ",re.split('\W+',saveKeyword)
 			self.metadata.__setitem__(k,re.split('\W+',saveKeyword))
-		for k in KWrem:
+		for k in self.KWrem:
 			if k in self.all_keys:
 				if self.Debug:
 					print "removing [",k,"]"
 				self.metadata.__delitem__(k)  
 		
+		# mark the metadata as unchanged before updating the file in
+		# case we trigger a file changed callback
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.metaChanged = False
 		self.metadata.write()
+		
+		# reload the metadata - otherwise we will get nonexistant key
+		# errors if we make any more changes without selecting a different
+		# file first.
+		self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)
 		
 		if self.Debug:
 			print 'after commit:'
 			self.showImages()
-			
-		#self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)		
-		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)		
-		self.metaChanged = False
-		#if self.changedImage != self.thumbImage:
-		#	self.changedImage.file_changed()
-		#self.changedImage = None
 
 		return True
 		
@@ -312,43 +335,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
 			self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
 			self.metaChanged = False
-			#self.changedImage = None
 
 		return True
-	
-	
-	
-	def showImages(self):
-		'''debug function: dump the current images paths'''
-		
-		if self.curImage == None:
-			print 'current: None'
-		else:
-			print 'current: ',urlparse(self.curImage.get_uri_for_display()).path
-		try:
-			print 'win says: ',urlparse(self.window.get_image().get_uri_for_display()).path
-		except:
-			print 'none'
-		if self.changedImage == None:
-			print 'changed: None'
-		else:
-			print 'changed: ',urlparse(self.changedImage.get_uri_for_display()).path
-		if self.thumbImage == None:	
-			print 'thumb: None'
-		else:
-			print 'thumb: ',urlparse(self.thumbImage.get_uri_for_display()).path
-		try:
-			print 'thumb says: ',urlparse(self.thumbview.get_first_selected_image().get_uri_for_display()).path
-		except:
-			print 'none'
 		
 		
 		
 	@staticmethod
 	def	selection_changed_cb(thumb, self):
 		'''
-		The file has changed.  Load the new metadata and update my dialog 
-		accordingly.
+		The file selection in the thumb navigator has changed.  
+		Load the new metadata and update the comboboxes accordingly.
 		
 		If this cb is hit when there are currently unsaved metadata changes
 		you will be prompted as to whether to 1) cancel the selection change,
@@ -361,58 +357,47 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		CANCEL=2	# cancel the file change
 		NO=1		# discard the changes and load the new file
 		YES=0		# save the changes and load the new file
-		
-		
-		
+				
 		self.curImage = self.window.get_image()
 		self.thumbImage = self.thumbview.get_first_selected_image()
 		Event = Gtk.get_current_event()
+		
 		if self.Debug:
-			print '\n\nfile changed ----------------------------------------------'
+			print '\n\nfile changed ----------------------------------------'
 			print 'Event: ',Event
 			if Event != None:
 				print 'Event type: ',Event.type
 			self.showImages()
 			
 		if Event != None and self.thumbImage == None:
+			# this happens when you use the toolbar next/previous buttons as 
+			# opposed to the arrow keys or clicking an icon in the thumb nav.
+			# seem to be able to safely just discard it and then the various
+			# new image selections work the same.
 			if self.Debug:
-				print 'selection event received with no thumbImage.  discard it'
-			return False
-			#self.thumbview.set_current_image(self.changedImage,True)
-		#	if self.Debug:
-		#		print 'throwing event caused by loading thumbnail'
-		#	return False		
+				print 'selection event received with no thumbImage.  discard!'
+			return False	
 		
 		# check to see if this callback is from a canceled file change
-		if self.ignoreChange < 0:  
+		if self.ignoreChange: 
+			# when cancel is selected in isChangedDialog the current image in
+			# the thumb nav is forced back to the modified image.  this causes
+			# a file changed callback that we want to ignore so that we don't
+			# overwrite the combobox modified data with the old file data. 
 			if self.Debug:
-				print 'ignoring change (%d)'%self.ignoreChange
-			#if self.ignoreChange == -1 and self.thumbImage != self.changedImage:
-			#	self.ignoreChange -= 1
-			#	self.thumbview.set_current_image(self.changedImage,True)
-			#	return False
+				print 'ignoring change'
 			
-			self.ignoreChange += 1
-			#if self.thumbImage != self.changedImage and self.thumbImage != None:
-			#	#self.ignoreChange -= 1
-			#	print 'resetting thumb again %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
-			#	self.thumbview.set_current_image(self.changedImage,True)
-			#	return True
-			#self.thumbview.unselect_all()
-			#self.thumbview.emit_stop_by_name('button-press-event')
-			#self.thumbview.emit(Gtk.EventButton)
-			#if self.fixME:
-			#	self.fixME = False
-			#	self.ignoreChange -= 1
-			#	print 'resetting again %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
-			#	self.thumbview.set_current_image(self.changedImage,True)
-								
-			return False	
+			self.ignoreChange = False							
+			return False
+			
 		elif self.metaChanged:
+			# a new file was selected but there are unsaved changes to the 
+			# current metadata!
 			
 			if self.Debug:
 				print '\n---------------------------------------------------'
-				print 'event: %s (%s) state: %s'%(Event.type,Event.get_click_count(),Event.get_state())
+				print 'event: %s (%s) state: %s'%(Event.type,\
+									Event.get_click_count(),Event.get_state())
 				print 'device: %s'%Event.get_device()
 				print 'source: %s'%Event.get_source_device()
 				print 'button: ',Event.get_button()
@@ -422,61 +407,45 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				print 'window stat: ',Event.window_state
 			
 			if Event.type == Gdk.EventType.BUTTON_PRESS:
-				# we got here by clicking a thumbnail in the thumb navigator.  throw away the
-				# release event or we will be left dragging the thumbnail after the dialog closes
-				# (not a critical error, but forces you to click an extra time in the thumb nav
-				# to release the drag
+				# we got here by clicking a thumbnail in the thumb navigator.
+				# throw away the release event or we will be left dragging 
+				# the thumbnail after the dialog closes (not a critical error, 
+				# but annoying and forces you to click an extra time in the 
+				# thumb nav to release it).  We don't seem to need to do 
+				# anything special if we got here by the arrow keys (Gdk.
+				# EventType.KEY_PRESS) or the toolbar Next/Previous (Gdk.
+				# EventType.BUTTON_RELEASE)
 				self.thumbview.emit('button-release-event', Event)
-				#E='Mouse'
-			#elif Event.type == Gdk.EventType.KEY_PRESS:
-				# got here by the arrow keys, no special handling seems to be required
-				#E='Arrow'
-			#elif Event.type == Gdk.EventType.BUTTON_RELEASE:
-				#E='Toolbar'
-
-				
-				# got here by the toolbar button (next/previous)
-				# if we treat this the same as the BUTTON_PRESS we are left with 2 images selected
-				# in nav windows with the wrong one displayed.  selecting the arrow again will cause
-				# a crash (glibc: eog double free or corruption)
-				#self.fixME = True
-				#pdb.set_trace()
-				#Event.free()
-				#self.thumbview.unselect_all()
-
 			
+			# display the dialog asking what to do and then hide it when we
+			# get the answer
 			self.result = self.isChangedDialog.run()
 			self.isChangedDialog.hide()
 
-			if self.result == CANCEL or self.result < 0:
+			if self.result == CANCEL or self.result < 0: # CANCEL or close
 				# stay on the current file.  
 				if self.changedImage != None:
 					if self.Debug:
-						print 'resetting thumb to %s (%s)'%(self.changedImage,urlparse(self.changedImage.get_uri_for_display()).path)
-					# ignore this and the next file changed callback so that we
+						print 'reset thumb %s'%urlparse(\
+							self.changedImage.get_uri_for_display()).path
+					# ignore the next file changed callback so that we
 					# revert to the previous photo without modifying the comboboxes
-					self.ignoreChange = -1
+					self.ignoreChange = True
 					self.thumbview.set_current_image(self.changedImage,True)
-					#self.scrollview.set_property('image',self.changedImage)
-					
 					return False
 				else:
-					print 'NOTHING TO REVERT TO!!!'
 					self.showImages()
+					raise AttributeError('Canceled but nothing to revert to!')
 				
 			elif self.result == YES:
-				# save the changes, as a result of the change this function will be 
-				# called again with the commit button state INSENSITIVE
+				# save the changes. the newly selected image in the thumb nav
+				# will still be loaded and the comboboxes will be updated with
+				# the new data.
 				self.commitButton.clicked()
-				#return False
 			else:
-				# no was pushed.  just continue on with the normal file change
-				self.metaChanged = False
-				#return True		
-		
-		#if self.curImage != None:
-		#	print 'loading current meta:',urlparse(self.curImage.get_uri_for_display()).path
-		#	self.loadMeta(urlparse(self.curImage.get_uri_for_display()).path)
+				# don't save.  just continue on with the normal file change
+				self.metaChanged = False		
+
 		if self.thumbImage == None:
 			if self.changedImage != None:
 				if self.Debug:
@@ -517,6 +486,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	
 	def loadMeta(self, filePath):
 		'''set the comboboxes to the current files data'''
+		
 		self.fileName.set_label(basename(filePath))
 		
 		self.metadata = pyexiv2.ImageMetadata(filePath)
@@ -562,31 +532,18 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			except:
 				self.newKeyword.append_text(k[0])
 		self.newKeyword.set_active(0)
-
+		
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.metaChanged = False
 
 
 			
 	def loadDates(self):
-		'''
-		see http://exiv2.org/tags.html
-		Exif.Image.DateTime is the mod time of the image
-		Exif.Photo.DateTimeOriginal, Photo.DateTimeDigitized and 
-		Image.DateTimeOriginal should be create date
-		The Xmp and Iptc date/time tags should be able to be deleted
-		
-		'''		
-		
-		DTvars = [	'Exif.Photo.DateTimeOriginal',
-					'Exif.Image.DateTimeOriginal', 
-					'Exif.Photo.DateTimeDigitized',
-					'Exif.Image.DateTime' ]
-		DTrem = [	'Xmp.exif.DateTimeOriginal',
-					'Xmp.dc.date',
-					'Iptc.Application2.DateCreated',
-					'Iptc.Application2.TimeCreated' ]
+		'''load the Date/Time combobox from the file metadata'''		
 		
 		myTimes = []		
-		for k in DTvars+DTrem:
+		for k in self.DTvars+self.DTrem:
 			if k in self.all_keys:
 				if self.metadata[k].raw_value not in myTimes:
 					myTimes.append(self.metadata[k].raw_value)
@@ -595,23 +552,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	
 	
 	def loadCaptions(self):
-		'''
-		see http://exiv2.org/tags.html
-		Exif.Image.ImageDescription can be an ascii caption
-		Exif.Photo.UserComment can contain unicode and should be interpreted 
-		as keywords
-		
-		If zenfolio recognizes caption/keywords in Exif data then should be able to get rid of
-		Iptc.Application2.Caption Xmp.acdsee.caption and Xmp.dc.description	
-		'''
-		
-		CAvars = [	'Exif.Image.ImageDescription']
-		CArem = [	'Iptc.Application2.Caption', 
-					'Xmp.dc.description', 
-					'Xmp.acdsee.caption' ]
+		'''load the Caption combobox from the file metadata'''
 		
 		myCaptions=[]		
-		for k in CAvars+CArem:
+		for k in self.CAvars+self.CArem:
 			if k in self.all_keys:
 				if self.metadata[k].raw_value not in myCaptions:
 					myCaptions.append(self.metadata[k].raw_value)				   
@@ -620,25 +564,41 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	
 	
 	def loadKeywords(self):
-		'''
-		see http://exiv2.org/tags.html
-		Exif.Image.ImageDescription can be an ascii caption
-		Exif.Photo.UserComment can contain unicode and should be 
-		interpreted as keywords
-		
-		If zenfolio recognizes caption/keywords in Exif data then should 
-		be able to get rid of Iptc.Application2.Caption Xmp.acdsee.caption 
-		and Xmp.dc.description	
-		
-		'''
+		'''load the Keyword combobox from the file metadata'''
 
 		myKeywords = []
 		
-		if 'Iptc.Application2.Keywords' in self.all_keys:
-			V=self.metadata['Iptc.Application2.Keywords'].raw_value
-			myKeywords.append(', '.join(V))
-			for kk in V:
-				myKeywords.append(kk)
+		for k in self.KWvars:
+			if k in self.all_keys:
+				V=self.metadata[k].raw_value
+				myKeywords.append(', '.join(V))
+				for kk in V:
+					myKeywords.append(kk)
 		return myKeywords	
 
-
+	
+	
+	
+	def showImages(self):
+		'''debug function: dump the current images paths'''
+		
+		if self.curImage == None:
+			print 'current: None'
+		else:
+			print 'current: ',urlparse(self.curImage.get_uri_for_display()).path
+		try:
+			print 'win says: ',urlparse(self.window.get_image().get_uri_for_display()).path
+		except:
+			print 'none'
+		if self.changedImage == None:
+			print 'changed: None'
+		else:
+			print 'changed: ',urlparse(self.changedImage.get_uri_for_display()).path
+		if self.thumbImage == None:	
+			print 'thumb: None'
+		else:
+			print 'thumb: ',urlparse(self.thumbImage.get_uri_for_display()).path
+		try:
+			print 'thumb says: ',urlparse(self.thumbview.get_first_selected_image().get_uri_for_display()).path
+		except:
+			print 'none'
