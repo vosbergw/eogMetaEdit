@@ -68,7 +68,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	# 
 	
 	Make = 'eogMetaEdit'
-	Model = 'v0.2b'
+	Model = 'v0.3b'
 	
 	EXvars = [	'Exif.Image.Make',
 				'Exif.Image.Model' ]

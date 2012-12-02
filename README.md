@@ -10,7 +10,7 @@ metadata for Zenfolio and Darktable (pre-import).
 When an image is loaded into EoG, the following will be checked:
 
 * Exif.Image.Make, if not set or Null, will be set to "eogMetaEdit"
-* Exif.Image.Model, if not set or Null, will be set to "eogMetaEdit v0.2b"
+* Exif.Image.Model, if not set or Null, will be set to "eogMetaEdit v0.3b"
 * Exif.Application2.Headline and Xmp.dc.title will be set to the image title.  
 * Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal, 
 Exif.Photo.DateTimeDigitized and Exif.Image.DateTime will all be set to the
