@@ -30,7 +30,7 @@
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">1</property>
+                <property name="top_attach">3</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -60,6 +60,7 @@
                     <property name="max_length">20</property>
                     <property name="invisible_char">•</property>
                     <property name="width_chars">20</property>
+                    <property name="text" translatable="yes">YYYY:MM:DD HH:MM:SS</property>
                     <property name="truncate_multiline">True</property>
                     <property name="placeholder_text">YYYY:MM:DD HH:MM:SS</property>
                     <signal name="changed" handler="Changed" swapped="no"/>
@@ -71,7 +72,7 @@
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">2</property>
+                <property name="top_attach">4</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -103,7 +104,7 @@
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">3</property>
+                <property name="top_attach">5</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -144,7 +145,7 @@
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">4</property>
+                <property name="top_attach">6</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -157,10 +158,11 @@
                 <property name="margin_top">8</property>
                 <property name="label" translatable="yes">&lt;b&gt;Keywords&lt;/b&gt;</property>
                 <property name="use_markup">True</property>
+                <property name="justify">fill</property>
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">5</property>
+                <property name="top_attach">7</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -196,7 +198,7 @@
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">6</property>
+                <property name="top_attach">8</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -237,15 +239,18 @@
                     <property name="has_tooltip">True</property>
                     <property name="tooltip_markup" translatable="yes">&lt;b&gt;Commit&lt;/b&gt; will modify the file as follows:
 
-Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal and Exif.Photo.DateTimeDigitized will be set to the value shown.  
-Xmp.exif.DateTimeOriginal, Xmp.dc.date, Iptc.Application2.DateCreated and Iptc.Application2.TimeCreated wil be removed from the file.
-
-Iptc.Application2.Caption will be set to the value shown.  
-Exif.Image.ImageDescription, Xmp.dc.description and Xmp.acdsee.caption  will be removed from the file.   
-
-Iptc.Application2.Keywords will be set to the value shown.
-Exif.Photo.UserComment will be removed from the file
-</property>
+* Exif.Image.Make, if not set or null, will be set to "eogMetaEdit"
+* Exif.Image.Model, if not set or null, will be set to "eogMetaEdit v0.2b"
+* Exif.Application2.Headline and Xmp.dc.title will be set to the image title.  
+* Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal,  Exif.Photo.DateTimeDigitized 
+   and Exif.Image.DateTime will all be set to the photo creation date.
+* Exif.Image.ImageDescription, Iptc.Application2.Caption and Xmp.dc.description will all be 
+   set to the caption.
+* Iptc.Application2.Keywords and Xmp.dc.subject will set to the list of keywords.
+* Iptc.Application2.DateCreated will be set to the photo creation date (YYYY-MM-DD)
+* Iptc.Application2.TimeCreated will be set to the photo creation time (HH:MM:SS)
+* Xmp.exif.DateTimeOriginal, Xmp.dc.date, Xmp.acdsee.caption and 
+   Exif.Photo.UserComment will be removed.</property>
                     <property name="use_action_appearance">False</property>
                     <signal name="clicked" handler="commitNotify" object="viewport2" swapped="no"/>
                   </object>
@@ -258,7 +263,7 @@ Exif.Photo.UserComment will be removed from the file
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">7</property>
+                <property name="top_attach">9</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -309,7 +314,54 @@ Exif.Photo.UserComment will be removed from the file
               </object>
               <packing>
                 <property name="left_attach">0</property>
-                <property name="top_attach">8</property>
+                <property name="top_attach">10</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="titleLabel">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="halign">start</property>
+                <property name="margin_top">8</property>
+                <property name="label" translatable="yes">&lt;b&gt;Title:&lt;/b&gt;</property>
+                <property name="use_markup">True</property>
+                <property name="justify">fill</property>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">1</property>
+                <property name="width">1</property>
+                <property name="height">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkComboBoxText" id="newTitle">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                <property name="has_tooltip">True</property>
+                <property name="tooltip_markup" translatable="yes">Short title for the image.</property>
+                <property name="tooltip_text" translatable="yes">Short title for the image.</property>
+                <property name="hexpand">True</property>
+                <property name="has_entry">True</property>
+                <property name="entry_text_column">0</property>
+                <property name="id_column">1</property>
+                <child internal-child="entry">
+                  <object class="GtkEntry" id="newTitleEntry">
+                    <property name="can_focus">True</property>
+                    <property name="events">GDK_KEY_PRESS_MASK | GDK_FOCUS_CHANGE_MASK | GDK_STRUCTURE_MASK | GDK_PROPERTY_CHANGE_MASK</property>
+                    <property name="placeholder_text">Image Title</property>
+                    <signal name="key-press-event" handler="inKey" swapped="no"/>
+                    <signal name="focus-in-event" handler="doFocus" swapped="no"/>
+                    <signal name="focus-out-event" handler="doFocus" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="left_attach">0</property>
+                <property name="top_attach">2</property>
                 <property name="width">1</property>
                 <property name="height">1</property>
               </packing>
@@ -318,6 +370,122 @@ Exif.Photo.UserComment will be removed from the file
         </child>
       </object>
     </child>
+  </object>
+  <object class="GtkDialog" id="errorMessageDialog">
+    <property name="can_focus">False</property>
+    <property name="border_width">5</property>
+    <property name="default_width">480</property>
+    <property name="default_height">260</property>
+    <property name="type_hint">dialog</property>
+    <property name="has_resize_grip">False</property>
+    <property name="mnemonics_visible">False</property>
+    <property name="focus_visible">False</property>
+    <child internal-child="vbox">
+      <object class="GtkBox" id="dialog-vbox2">
+        <property name="can_focus">False</property>
+        <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
+        <child internal-child="action_area">
+          <object class="GtkButtonBox" id="dialog-action_area2">
+            <property name="can_focus">False</property>
+            <property name="homogeneous">True</property>
+            <property name="layout_style">spread</property>
+            <child>
+              <object class="GtkButton" id="revertError">
+                <property name="label" translatable="yes">Revert</property>
+                <property name="use_action_appearance">False</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <signal name="clicked" handler="errorOK" swapped="no"/>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="okError">
+                <property name="label" translatable="yes">Ok</property>
+                <property name="use_action_appearance">False</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="pack_type">end</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkBox" id="box3">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="orientation">vertical</property>
+            <child>
+              <object class="GtkLabel" id="label3">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">eogMetaEdit Error!</property>
+                <attributes>
+                  <attribute name="style" value="italic"/>
+                  <attribute name="weight" value="bold"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="errorMsg">
+                <property name="visible">True</property>
+                <property name="sensitive">False</property>
+                <property name="can_focus">False</property>
+                <property name="margin_left">4</property>
+                <property name="margin_right">4</property>
+                <property name="margin_top">8</property>
+                <property name="margin_bottom">8</property>
+                <property name="hexpand">True</property>
+                <property name="vexpand">True</property>
+                <property name="label" translatable="yes">error message</property>
+                <property name="wrap">True</property>
+                <attributes>
+                  <attribute name="font-desc" value="Arial 12"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    <action-widgets>
+      <action-widget response="1">revertError</action-widget>
+      <action-widget response="0">okError</action-widget>
+    </action-widgets>
   </object>
   <object class="GtkDialog" id="isChangedDialog">
     <property name="can_focus">False</property>
@@ -402,7 +570,7 @@ Exif.Photo.UserComment will be removed from the file
               <object class="GtkLabel" id="label1">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="label" translatable="yes">WARNING!</property>
+                <property name="label" translatable="yes">eogMetaEdit Warning!</property>
                 <attributes>
                   <attribute name="style" value="oblique"/>
                   <attribute name="weight" value="bold"/>

@@ -17,13 +17,15 @@ along with eogMetaEdit.  If not, see <http://www.gnu.org/licenses/>.
 Copyright 2012 Wayne Vosberg <wayne.vosberg@mindtunnel.com>
 '''
 
-from gi.repository import GObject, Gtk, Gdk, Eog, PeasGtk
+from gi.repository import GObject, Gtk, Gdk, Eog, PeasGtk # , Pango
 from os.path import join, basename
 from urlparse import urlparse
 import pyexiv2
 import re
+import datetime
 import time
 from string import strip
+#import pango
 
 
 
@@ -33,7 +35,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	window = GObject.property(type=Eog.Window)	
 	Debug = False
 	
-	# definition of metadata to manage. DT=date/time, CA=caption
+	# definition of metadata to manage. TI=title, DT=date/time, CA=caption
 	# and KW=keyword
 	#
 	# on load, existing XXvars and XXrem variables will be added
@@ -42,20 +44,63 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	# the combobox and all XXrem variables will be removed from
 	# the file
 	#
+	# ****************
+	#
+	# The following values will be set to be compatible with zenfolio:
+	# 
+	# Iptc.Application2.Caption = caption
+	# Iptc.Application2.Keywords = keywords
+	# Iptc.Application2.Headline = title
+	# Iptc.Application2.Copyright = copyright (future)
+	# Exif.Photo.DateTimeOriginal = date/time taken
+	# Exif.Image.Make and Model will be set to Canon/Canon MP990 series Network if not already set
+	#
+	# ****************
+	# 
+	# To make the images compatible with Darktable, the following values will also be set:
+	# 
+	# Iptc.Application2.Headline = Xmp.dc.title = title
+	# Xmp.dc.description = Iptc.Application2.Caption = caption
+	# Iptc.Application2.Keywords = Xmp.dc.subject = keywords
+	# Iptc.Application2.DateCreated = date taken
+	# Iptc.Application2.TimeCreated = time taken
+	# Xmp.lr.hierarchicalSubject will not be set since I am not supporting the Lightroom namespace yet
+	# 
+	
+	Make = 'eogMetaEdit'
+	Model = 'v0.2b'
+	
+	EXvars = [	'Exif.Image.Make',
+				'Exif.Image.Model' ]
+	
+	TIvars = [	'Iptc.Application2.Headline',
+				'Xmp.dc.title' ]
+	TIrem =  [	]
+	
 	DTvars = [	'Exif.Photo.DateTimeOriginal',
 				'Exif.Image.DateTimeOriginal', 
 				'Exif.Photo.DateTimeDigitized',
 				'Exif.Image.DateTime' ]
+	
+	vDates = [	'%Y:%m:%d %H:%M:%S',
+				'%Y:%m:%dT%H:%M:%S',
+				'%Y-%m-%d %H:%M:%S',
+				'%Y-%m-%dT%H:%M:%S' ]
+	
+	isoDate = [	'Iptc.Application2.DateCreated' ]
+	isoTime = [	'Iptc.Application2.TimeCreated' ]
+	
 	DTrem  = [	'Xmp.exif.DateTimeOriginal',
-				'Xmp.dc.date',
-				'Iptc.Application2.DateCreated',
-				'Iptc.Application2.TimeCreated' ]
-	CAvars = [	'Exif.Image.ImageDescription']
-	CArem  = [	'Iptc.Application2.Caption', 
-				'Xmp.dc.description', 
-				'Xmp.acdsee.caption' ]
-	KWrem  = [	'Exif.Photo.UserComment' ]
-	KWvars = [	'Iptc.Application2.Keywords' ]  
+				'Xmp.dc.date'	]
+	
+	CAvars = [	'Exif.Image.ImageDescription',
+				'Iptc.Application2.Caption',
+				'Xmp.dc.description' ]
+	CArem  = [	'Xmp.acdsee.caption' ]
+	
+	KWvars  = [	'Iptc.Application2.Keywords',
+				'Xmp.dc.subject' ]
+	KWrem = [ 	'Exif.Photo.UserComment' ]  
 		
 		
 		
@@ -87,10 +132,14 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 								"eogMetaEdit.glade"))
 		pluginDialog = builder.get_object('eogMetaEdit')
 		self.isChangedDialog = builder.get_object('isChangedDialog')
-		
+		self.errorMessageDialog = builder.get_object('errorMessageDialog')
+		self.errorMsg = builder.get_object('errorMsg')
 		
 		# my widgets		
 		self.fileName = builder.get_object("fileName")
+		
+		self.newTitle = builder.get_object('newTitle')
+		self.newTitleEntry = builder.get_object('newTitleEntry')
 		
 		self.newDate = builder.get_object("newDate")
 		self.newDateEntry = builder.get_object("newDateEntry")
@@ -110,8 +159,8 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.metaChanged = False
 		
 		# these lists are for convenience later
-		self.combos =  [	self.newDate, self.newCaption, self.newKeyword ]
-		self.entries = [	self.newDateEntry, self.newCaptionEntry, 
+		self.combos =  [	self.newTitle, self.newDate, self.newCaption, self.newKeyword ]
+		self.entries = [	self.newTitleEntry, self.newDateEntry, self.newCaptionEntry, 
 							self.newKeywordEntry ]
 		
 		# set up my callbacks
@@ -140,7 +189,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			for W in self.entries:
 				self.cb_ids[S][W] = W.connect(S, self.focus_event_cb, \
 					self.window, self.cb_ids['key-press-event'][self.window])
-
+		
+		self.cb_ids['focus-out-event'][self.newDateEntry] = self.newDateEntry.connect(\
+			'focus-out-event',self.test_date_cb, self.newDate, self)
+		
 		for S in 'changed',:
 			if not self.cb_ids.has_key(S):
 				self.cb_ids[S]={}
@@ -160,6 +212,11 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		# finally, add my dialog to the sidebar
 		Eog.Sidebar.add_page(self.sidebar,"Metadata Editor", pluginDialog)
+		
+		if self.thumbview.get_first_selected_image() != None:
+				self.changedImage = self.thumbview.get_first_selected_image()
+				self.loadMeta(urlparse(self.changedImage.\
+							get_uri_for_display()).path)
 
 	
 		
@@ -177,6 +234,64 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 
 
 
+	def date_validate(self, entry):
+		''' '''
+		nd = entry.get_active_text()
+		for t in self.vDates:
+			try:
+				d = datetime.datetime.strptime( nd, t)				
+				# date is OK
+				return 2
+			except:
+				pass
+			
+		message='Failed to match [%s] with one of:\n\n[%s]\n[%s]\n[%s]\n[%s]'% \
+			(nd,self.vDates[0],self.vDates[1],self.vDates[2],self.vDates[3])
+			
+		self.errorMsg.set_text(message)
+		r = self.errorMessageDialog.run()
+		self.errorMessageDialog.hide()
+		return r
+		
+		
+	@staticmethod
+	def test_date_cb(widget,event,entry, win):
+		''' test the validity of the date string (against vDates format) '''
+		
+		'''
+		nd = entry.get_active_text()
+		
+		for t in win.vDates:
+			try:
+				d = datetime.datetime.strptime( nd, t)				
+				# date is OK
+				if win.Debug:
+					print 'matched [%s] with [%s]'%(nd,t)
+				return False
+			except:
+				pass
+		
+		# failed to match a date string
+		message='Failed to match [%s] with one of:\n\n[%s]\n[%s]\n[%s]\n[%s]'% \
+			(nd,win.vDates[0],win.vDates[1],win.vDates[2],win.vDates[3])
+			
+		win.errorMsg.set_text(message)
+		r = win.errorMessageDialog.run()
+		win.errorMessageDialog.hide()
+		'''
+		r = win.date_validate(entry)
+		
+		if r == 2:
+			return False
+		elif r == 1:
+			entry.set_active(0)
+			return False
+		else:	
+			entry.grab_focus()
+			return True
+	
+	
+
 	@staticmethod
 	def focus_event_cb(widget, event, win, id):
 		'''
@@ -185,7 +300,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		that the combobox can get the key-press and not eog_window_key_press.
 		
 		'''
-		
+			
 		if widget.has_focus():
 			win.handler_unblock(id)
 		else:
@@ -259,12 +374,78 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			print '\ncommit: ',\
 				urlparse(self.changedImage.get_uri_for_display()).path
 		
-		saveDate = self.newDate.get_active_text()
-		saveCaption = self.newCaption.get_active_text()
-		saveKeyword = self.newKeyword.get_active_text()
+		#print 'event: ',dir(self.newDateEntry)
 		
+		'''
+		event = Gdk.Event(Gdk.EventType.FOCUS_CHANGE)
+		event.window = self.newDateEntry  # the gtk.gdk.Window of the widget
+		event.send_event = True  # this means you sent the event explicitly
+		event.in_ = False  # False for focus out, True for focus in
+		self.newDateEntry.emit('focus-out-event',event)
+		'''
+		'''
+		r = self.date_validate(self.newDate)		
+		if r == 2:
+			pass
+		elif r == 1:
+			entry.set_active(0)
+			return True
+		else:	
+			entry.grab_focus()
+			return True
+		'''
+		
+		saveTitle = self.newTitle.get_active_text()
+		saveDate = self.newDate.get_active_text()
+		
+		for t in self.vDates:
+			try:
+				# I already test for validity on focus-out-event
+				d=datetime.datetime.strptime( saveDate, t)
+				newisoDate = str(d.date()) # d.strftime("%Y-%m-%d")
+				newisoTime = str(d.time())+'+00:00' # d.strftime("%H:%M:%S")
+				break
+			except:
+				pass
+		
+		saveCaption = self.newCaption.get_active_text()
+		if saveCaption == "" :
+			saveCaption = "n/a"
+		saveKeyword = self.newKeyword.get_active_text()
+		if saveKeyword == "":
+			saveKeyword = "n/a"
+		
+		
+		if saveTitle == "":
+			saveTitle = newisoDate
+			
 		# set the vars in XXvars and remove the ones in XXrem
 		
+		if self.EXvars[0] not in self.all_keys or \
+					len(self.metadata[self.EXvars[0]].raw_value) == 0:
+			if self.Debug:
+				print 'setting %s to eogMetaEdit'%self.EXvars[0]
+				
+			self.metadata.__setitem__(self.EXvars[0],self.Make)
+			
+		if self.EXvars[1] not in self.all_keys or \
+					len(self.metadata[self.EXvars[1]].raw_value) == 0:
+			if self.Debug:
+				print 'setting %s to eogMetaEdit v2.0'%self.EXvars[1]
+			self.metadata.__setitem__(self.EXvars[1],self.Make+' '+self.Model)
+				
+		# title variables
+		for k in self.TIvars:
+			if self.Debug:
+				print 'update[',k,'] to [',saveTitle,']'
+			try:
+				self.metadata.__setitem__(k,saveTitle)
+			except TypeError:
+				self.metadata.__setitem__(k,[saveTitle])
+			
+			
+			
+			
 		# date/time variables
 		for k in self.DTvars:
 			if self.Debug:
@@ -276,11 +457,29 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 					print "removing [",k,"]"
 				self.metadata.__delitem__(k)
 		
+		for k in self.isoDate:
+			if self.Debug:
+				print 'update [',k,'] to [',d.date()
+			try:
+				self.metadata.__setitem__(k,d.date())
+			except TypeError:
+				self.metadata.__setitem__(k,[d.date()])
+		for k in self.isoTime:
+			if self.Debug:
+				print 'update [',k,'] to [',d.time()
+			try:
+				self.metadata.__setitem__(k,d.time())
+			except TypeError:
+				self.metadata.__setitem__(k,[d.time()])
+			
 		# caption variables	   
 		for k in self.CAvars:
 			if self.Debug:
 				print "update [",k,"]  to [",saveCaption,"]"
-			self.metadata.__setitem__(k,[saveCaption])
+			try:
+				self.metadata.__setitem__(k,saveCaption)
+			except TypeError:
+				self.metadata.__setitem__(k,[saveCaption])
 		for k in self.CArem:
 			if k in self.all_keys:
 				if self.Debug:
@@ -395,7 +594,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			# a new file was selected but there are unsaved changes to the 
 			# current metadata!
 			
-			if self.Debug:
+			if self.Debug and Event != None:
 				print '\n---------------------------------------------------'
 				print 'event: %s (%s) state: %s'%(Event.type,\
 									Event.get_click_count(),Event.get_state())
@@ -407,7 +606,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				print 'screen: ',Event.get_screen()
 				print 'window stat: ',Event.window_state
 			
-			if Event.type == Gdk.EventType.BUTTON_PRESS:
+			if Event != None and Event.type == Gdk.EventType.BUTTON_PRESS:
 				# we got here by clicking a thumbnail in the thumb navigator.
 				# throw away the release event or we will be left dragging 
 				# the thumbnail after the dialog closes (not a critical error, 
@@ -465,9 +664,9 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			return False
 		
 		# freshly set comboboxes, disable commit and revert
-		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.metaChanged = False
+		#self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		#self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		#self.metaChanged = False
 
 		# return False to let any other callbacks execute as well
 		return False
@@ -494,26 +693,75 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.metadata.read()		
 		self.all_keys = self.metadata.exif_keys+self.metadata.iptc_keys+\
 			self.metadata.xmp_keys
-			
+		
+		newTitles = self.loadTitles()	
 		newDates = self.loadDates()			
 		newCaptions = self.loadCaptions()
+		if len(newCaptions) == 0:
+			newCaptions.append('n/a')
 		newKeywords = self.loadKeywords()
+		if len(newKeywords) == 0:
+			newKeywords.append('n/a')
 
 		for CB in self.combos:
 			self.clearCombo(CB)
 		
 		# clear the combobox text entry as well
+		self.newTitleEntry.set_text('')
 		self.newDateEntry.set_text('')
 		self.newCaptionEntry.set_text('')
 		self.newKeywordEntry.set_text('')		
 		
 		# and finally set the new values and make them active
+		
+		
+			
+		
+		# validate the date string in the file.  if it is bad, set it to today.
+		try:
+			saveDate = newDates[0]
+		except:
+			saveDate = ''
+			
+		for t in self.vDates:
+			try:
+				d=datetime.datetime.strptime( saveDate, t)
+				break
+			except:
+				pass
+		try:
+			newisoDate = d.strftime("%Y-%m-%d")
+			newisoTime = d.strftime("%H:%M:%S")
+		except:
+			d = datetime.datetime.now()
+			newisoDate = str(d.date()) # "YY-MM-DD"
+			newisoTime = str(d.strftime('%H:%M:%S'))+'+00:00' # "HH:MM:SS"
+			print 'Invalid date: [%s] using current: [%s]'%(saveDate,str(d.strftime('%Y:%m:%d %H:%M:%S')))
+			newDates.insert(0,str(d.strftime('%Y:%m:%d %H:%M:%S')))
+		
 		for t in newDates:
 			try:
 				self.newDate.append_text(t)
 			except:
 				self.newDate.append_text(t[0])
-		self.newDate.set_active(0)		
+		self.newDate.set_active(0)
+
+		newTitles.insert(0,newisoDate)
+		
+		for t in newTitles:
+			try:
+				self.newTitle.append_text(t)
+			except:
+				try:
+					self.newTitle.append_text(t[0])
+				except KeyError:
+					self.newTitle.append_text(t['x-default'])
+				except:
+					print 'error:',sys.exc_info()
+		self.newTitle.set_active(0)
+		
+		
+		
 		
 		for c in newCaptions:
 			try:
@@ -534,21 +782,117 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.newKeyword.append_text(k[0])
 		self.newKeyword.set_active(0)
 		
-		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
-		self.metaChanged = False
+		# check to see if the commit/revert buttons should be active (any changes needed?)
+		
+		saveTitle = self.newTitle.get_active_text()
+		saveDate = self.newDate.get_active_text()
+		for t in self.vDates:
+			try:
+				d=datetime.datetime.strptime( saveDate, t)
+				break
+			except:
+				pass
+		try:
+			newisoDate = str(d.date()) # d.strftime("%Y-%m-%d")
+			newisoTime = str(d.time())+'+00:00' # d.strftime("%H:%M:%S")
+		except:
+			d = datetime.datetime.now()
+			newisoDate = str(d.date())
+			newisoTime = str(dd.strftime('%H:%M:%S'))+'+00:00'
+			print 'Invalid date: [%s]'%saveDate	
+		
+		if self.Debug:
+			print 'newisoDate: ',newisoDate
+			print 'newisoTime: ',newisoTime
+			
+		saveCaption = self.newCaption.get_active_text()
+		saveKeyword = self.newKeyword.get_active_text()
+		
+		need_commit = self.checkInitial(self.TIvars,self.TIrem,saveTitle)
+		for k in self.EXvars:
+			if k not in self.all_keys:
+				need_commit = True
+				break
+		if not need_commit:
+			need_commit = self.checkInitial(self.DTvars,self.DTrem,saveDate)
+		if not need_commit:
+			need_commit = self.checkInitial(self.CAvars,self.CArem,saveCaption)
+		if not need_commit:
+			need_commit = self.checkInitial(self.KWvars,self.KWrem,saveKeyword)
+		if not need_commit:
+			need_commit = self.checkInitial(self.isoDate,[],newisoDate)
+		if not need_commit:
+			need_commit = self.checkInitial(self.isoTime,[],newisoTime)
+			
+		if self.Debug:
+			print 'need commit: ',need_commit
+			
+		if need_commit:
+			self.commitButton.set_state(Gtk.StateType.NORMAL)
+			self.revertButton.set_state(Gtk.StateType.NORMAL)
+			self.metaChanged = True
+		else:
+			self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.metaChanged = False
+
+
+
+	def	checkInitial(self,saveVars,remVars,newValue):
+		''' check to see if the file needs a commit '''
+	
+		for k in saveVars:
+				if k in self.all_keys:
+					if type(self.metadata[k].raw_value) == str:
+						if self.metadata[k].raw_value != newValue:
+							if self.Debug:
+								print k,'(s)[',self.metadata[k].raw_value,']!=[',newValue,']'
+							return True
+					elif type(self.metadata[k].raw_value) == list:
+						if ', '.join(self.metadata[k].raw_value) != newValue:
+							if self.Debug:
+								print k,'(l)[',','.join(self.metadata[k].raw_value),']!=[',newValue,']'
+							return True
+					else:
+						if self.metadata[k].raw_value['x-default'] != newValue:
+							if self.Debug:
+								print k,'(d)[',self.metadata[k].raw_value['x-default'],']!=[',newValue,']'
+							return True							
+				else:
+					if self.Debug:
+						print k,' non-existent'
+					return True
+		for k in remVars:
+			if k in self.all_keys:
+				if self.Debug:
+					print k,' exists'
+				return True
+		return False
 
 
 			
 	def loadDates(self):
 		'''load the Date/Time combobox from the file metadata'''		
 		
-		myTimes = []		
+		myTimes = []
+				
 		for k in self.DTvars+self.DTrem:
 			if k in self.all_keys:
 				if self.metadata[k].raw_value not in myTimes:
-					myTimes.append(self.metadata[k].raw_value)
+					myTimes.append(self.metadata[k].raw_value)		
 		return myTimes
+	
+	
+	
+	def loadTitles(self):
+		'''load the Title combobox from the file metadat '''
+		
+		myTitles=[]
+		for k in self.TIvars+self.TIrem:
+			if k in self.all_keys:
+				if self.metadata[k].raw_value not in myTitles:
+					myTitles.append(self.metadata[k].raw_value)
+		return myTitles
 	
 	
 	
@@ -572,9 +916,17 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		for k in self.KWvars:
 			if k in self.all_keys:
 				V=self.metadata[k].raw_value
-				myKeywords.append(', '.join(V))
-				for kk in V:
-					myKeywords.append(kk)
+				if self.Debug:
+					print 'k: ',k,' V: ',V
+				if type(V) == str:
+					myKeywords.append(V)
+				else:
+					myKeywords.append(', '.join(V))
+					for kk in V:
+						myKeywords.append(kk)
+		if self.Debug:
+			print 'myKeywords:',myKeywords
+			
 		return myKeywords	
 
 	
