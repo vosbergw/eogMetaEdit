@@ -25,6 +25,7 @@ import re
 import datetime
 import time
 from string import strip
+import sys
 #import pango
 
 
@@ -613,6 +614,8 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				print "update [",k,"]  to [",saveCaption,"]"
 			try:
 				self.metadata.__setitem__(k,saveCaption)
+			except UnicodeDecodeError:
+				self.metadata.__setitem__(k,saveCaption.decode('utf-8'))
 			except TypeError:
 				self.metadata.__setitem__(k,[saveCaption])
 		for k in self.CArem:
@@ -894,11 +897,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				if not newTitles[0].startswith(newisoDate):
 					newTitles[0] = newisoDate+' - '+newTitles[0]
 			
-			for t in newTitles:
+		for t in newTitles:
+			try:
+				self.newTitle.append_text(t)
+			except TypeError:
 				try:
-					self.newTitle.append_text(t)
+					self.newTitle.append_text(t[0])
+				except KeyError:
+					self.newTitle.append_text(t['x-default'])
 				except:
-					print 'error:',sys.exc_info()
+					print 'title error:',sys.exc_info()
 					
 		self.newTitle.set_active(0)
 		
@@ -908,13 +916,13 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		for c in newCaptions:
 			try:
 				self.newCaption.append_text(c)
-			except:
+			except TypeError:
 				try:
 					self.newCaption.append_text(c[0])
 				except KeyError:
 					self.newCaption.append_text(c['x-default'])
 				except:
-					print 'error:',sys.exc_info()
+					print 'caption error:',sys.exc_info()
 					
 		self.newCaption.set_active(0)	
 		
@@ -1037,13 +1045,15 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		myTitles=[]
 		for k in self.TIvars+self.TIrem:
 			if k in self.all_keys:
-				if self.metadata[k].raw_value not in myTitles:
-					try:
-						myTitles.append(self.metadata[k].raw_value[0])
-					except KeyError:
-						myTitles.append(self.metadata[k].raw_value['x-default'])
-					except:
-						myTitles.append(self.metadata[k].raw_value)
+				if type(self.metadata[k].raw_value) == str:
+					v=self.metadata[k].raw_value
+				elif type(self.metadata[k].raw_value) == list:
+					v=self.metadata[k].raw_value[0]
+				else:
+					v=self.metadata[k].raw_value['x-default']
+					
+				if v not in myTitles:
+					myTitles.append(v)
 		return myTitles
 	
 	
@@ -1054,9 +1064,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		myCaptions=[]		
 		for k in self.CAvars+self.CArem:
 			if k in self.all_keys:
-				if self.metadata[k].raw_value.strip('\00') not in myCaptions:
-					if len(self.metadata[k].raw_value.strip('\00')) > 0: 
-						myCaptions.append(self.metadata[k].raw_value.strip('\00'))				   
+				if type(self.metadata[k].raw_value) == str:
+					v=self.metadata[k].raw_value.strip('\00')
+				elif type(self.metadata[k].raw_value) == list:
+					v=self.metadata[k].raw_value[0].strip('\00')
+				else:
+					v=self.metadata[k].raw_value['x-default'].strip('\00')
+					
+				if v not in myCaptions:
+					myCaptions.append(v)
+			   
 		return myCaptions
 	
 	
