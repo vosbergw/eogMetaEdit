@@ -845,7 +845,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		newKeywords = self.loadKeywords()
 		if self.forceDefaults.get_active():
 			if len(newCaptions) == 0 or newCaptions[0] == '':
-				newCaptions.append('N/A')		
+				newCaptions.insert(0,'N/A')		
 			if len(newKeywords) == 0:
 				newKeywords.append('N/A')
 
@@ -895,7 +895,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				newTitles.insert(0,newisoDate)
 			else:
 				if not newTitles[0].startswith(newisoDate):
-					newTitles[0] = newisoDate+' - '+newTitles[0]
+					newTitles[0] = newisoDate+' - '+newTitles[0]				
 			
 		for t in newTitles:
 			try:
