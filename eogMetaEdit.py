@@ -40,6 +40,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	#
 	# on load, existing XXvars and XXrem variables will be added
 	# to the combobox pulldown.
+	#
 	# on save, XXvars variables will all be set to the value in
 	# the combobox and all XXrem variables will be removed from
 	# the file
@@ -74,6 +75,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				'Exif.Image.Model' ]
 	
 	TIvars = [	'Iptc.Application2.Headline',
+				'Exif.Image.ImageDescription',
 				'Xmp.dc.title' ]
 	TIrem =  [	]
 	
@@ -93,14 +95,14 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	DTrem  = [	'Xmp.exif.DateTimeOriginal',
 				'Xmp.dc.date'	]
 	
-	CAvars = [	'Exif.Image.ImageDescription',
+	CAvars = [	'Exif.Photo.UserComment',				
 				'Iptc.Application2.Caption',
 				'Xmp.dc.description' ]
 	CArem  = [	'Xmp.acdsee.caption' ]
 	
 	KWvars  = [	'Iptc.Application2.Keywords',
 				'Xmp.dc.subject' ]
-	KWrem = [ 	'Exif.Photo.UserComment' ]  
+	KWrem = [ 	 ]  
 		
 		
 		
@@ -152,6 +154,9 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		self.commitButton = builder.get_object('commitButton')
 		self.revertButton = builder.get_object('revertButton')
+		
+		self.forceDefaults = builder.get_object('forceDefaults')
+		self.changeDetails = builder.get_object('changeDetails')
 		
 		# set the buttons disabled initially
 		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
@@ -210,6 +215,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			self.thumbview.connect('selection-changed', \
 				self.selection_changed_cb, self)
 		
+		self.cb_ids['toggled'] = {}
+		self.cb_ids['toggled'][self.forceDefaults] = \
+			self.forceDefaults.connect('toggled', self.forceToggled, self)
+			
 		# finally, add my dialog to the sidebar
 		Eog.Sidebar.add_page(self.sidebar,"Metadata Editor", pluginDialog)
 		
@@ -252,6 +261,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		r = self.errorMessageDialog.run()
 		self.errorMessageDialog.hide()
 		return r
+		
 		
 		
 	@staticmethod
@@ -364,36 +374,10 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		# return True -- default callback isn't needed
 		return True
 			
-			
-			
-	@staticmethod
-	def commit_clicked_cb(plugin, self):
-		'''Commit the changes to the file'''
-		
-		if self.Debug:
-			print '\ncommit: ',\
-				urlparse(self.changedImage.get_uri_for_display()).path
-		
-		#print 'event: ',dir(self.newDateEntry)
-		
-		'''
-		event = Gdk.Event(Gdk.EventType.FOCUS_CHANGE)
-		event.window = self.newDateEntry  # the gtk.gdk.Window of the widget
-		event.send_event = True  # this means you sent the event explicitly
-		event.in_ = False  # False for focus out, True for focus in
-		self.newDateEntry.emit('focus-out-event',event)
-		'''
-		'''
-		r = self.date_validate(self.newDate)		
-		if r == 2:
-			pass
-		elif r == 1:
-			entry.set_active(0)
-			return True
-		else:	
-			entry.grab_focus()
-			return True
-		'''
+	
+	
+	def show_changes(self):
+		''' return a string detailing the changes a commit would make '''
 		
 		saveTitle = self.newTitle.get_active_text()
 		saveDate = self.newDate.get_active_text()
@@ -410,12 +394,166 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		saveCaption = self.newCaption.get_active_text()
 		if saveCaption == "" :
-			saveCaption = "n/a"
+			saveCaption = "N/A"
 		saveKeyword = self.newKeyword.get_active_text()
 		if saveKeyword == "":
-			saveKeyword = "n/a"
+			saveKeyword = "N/A"
 		
+		if saveTitle == "":
+			saveTitle = newisoDate
+			
+		changeString = ''
 		
+		if self.EXvars[0] not in self.all_keys or \
+					len(self.metadata[self.EXvars[0]].raw_value) == 0:
+			changeString += '\n   set %s to "%s"'%(self.EXvars[0],self.Make)
+			
+		if self.EXvars[1] not in self.all_keys or \
+					len(self.metadata[self.EXvars[1]].raw_value) == 0:
+			changeString += '\n   set %s to "%s"'%(self.Exvars[1],self.Make+' '+self.Model)	
+		
+		# title variables
+		for k in self.TIvars:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,saveTitle)
+			else:
+				v=self.metadata[k].raw_value
+				if type(v) == str and v != saveTitle:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,saveTitle)
+				elif type(v) == list and v[0] != saveTitle:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v[0],saveTitle)
+				elif type(v) == dict and v['x-default'] != saveTitle: 
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],saveTitle)
+					
+			
+		# date/time variables
+		for k in self.DTvars:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,saveDate)
+			else:
+				v=self.metadata[k].raw_value
+				if type(v) == str and v != saveDate:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,saveDate)
+				elif type(v) == list and v[0] != saveDate:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v[0],saveDate)
+				elif type(v) == dict and v['x-default'] != saveDate: 
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],saveDate)
+						
+		for k in self.DTrem:
+			if k in self.all_keys:
+				changeString += '\nremove %s'%k
+		
+		for k in self.isoDate:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,d.date())
+			else:
+				v=self.metadata[k].raw_value
+				nd=str(d.date())
+				if type(v) == str and v != nd:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,nd)
+				elif type(v) == list and v[0] != nd:
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v[0],nd)
+				elif type(v) == dict and v['x-default'] != nd: 
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],nd)
+
+		for k in self.isoTime:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,d.time())
+			else:
+				v=self.metadata[k].raw_value
+				nt=str(d.time())
+				
+				if type(v) == str and not v.startswith(nt):
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,nt)
+				elif type(v) == list and not v[0].startswith(nt):
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v[0],nt)
+				elif type(v) == dict and not v['x-default'].startwith(nt): 
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],nt)
+			
+		# caption variables	   
+		for k in self.CAvars:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,saveCaption)
+			else:
+				v=self.metadata[k].raw_value
+				if type(v) == str and v != saveCaption:
+					changeString += '\nupdate1 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,saveCaption)
+				elif type(v) == list and v[0] != saveCaption:
+					changeString += '\nupdate2 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v[0],saveCaption)
+				elif type(v) == dict and v['x-default'] != saveCaption: 
+					changeString += '\nupdate3 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],saveCaption)
+			
+		for k in self.CArem:
+			if k in self.all_keys:
+				changeString += '\nremove %s'%k	
+		
+		# keyword variables
+		newKW = ' '.join(re.split(',\s+',saveKeyword)).split()
+		for k in self.KWvars:
+			if k not in self.all_keys:
+				changeString += '\n   add %s  = "%s"'%(k,newKW)
+			else:
+				v=self.metadata[k].raw_value
+				if type(v) == str and v != newKW:
+					changeString += '\nupdate4 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,newKW)
+				elif type(v) == list and v != newKW:
+					changeString += '\nupdate5 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v,newKW)
+				elif type(v) == dict and v['x-default'] != newKW: 
+					changeString += '\nupdate6 %s \n\tfrom "%s" \n\t  to "%s"'%\
+						(k,v['x-default'],newKW)	
+			
+		for k in self.KWrem:
+			if k in self.all_keys:
+				changeString += '\nremove %s'%k
+
+		return changeString
+	
+	
+			
+	@staticmethod
+	def commit_clicked_cb(plugin, self):
+		'''Commit the changes to the file'''
+		
+		if self.Debug:
+			print '\ncommit: ',\
+				urlparse(self.changedImage.get_uri_for_display()).path
+		
+		saveTitle = self.newTitle.get_active_text()
+		saveDate = self.newDate.get_active_text()
+		
+		for t in self.vDates:
+			try:
+				# I already test for validity on focus-out-event
+				d=datetime.datetime.strptime( saveDate, t)
+				newisoDate = str(d.date()) # d.strftime("%Y-%m-%d")
+				newisoTime = str(d.time())+'+00:00' # d.strftime("%H:%M:%S")
+				break
+			except:
+				pass
+		
+		saveCaption = self.newCaption.get_active_text()
+		if saveCaption == "" :
+			saveCaption = "N/A"
+		saveKeyword = self.newKeyword.get_active_text()
+		if saveKeyword == "":
+			saveKeyword = "N/A"	
 		if saveTitle == "":
 			saveTitle = newisoDate
 			
@@ -442,10 +580,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.metadata.__setitem__(k,saveTitle)
 			except TypeError:
 				self.metadata.__setitem__(k,[saveTitle])
-			
-			
-			
-			
+		
 		# date/time variables
 		for k in self.DTvars:
 			if self.Debug:
@@ -487,8 +622,8 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.metadata.__delitem__(k)		
 		
 		# keyword variables
-		for k in self.KWvars:
-			newKW = ' '.join(re.split(',\s+',saveKeyword)).split()
+		newKW = ' '.join(re.split(',\s+',saveKeyword)).split()
+		for k in self.KWvars:			
 			if self.Debug:
 				print "update [",k,"] to ",newKW
 			self.metadata.__setitem__(k,newKW)
@@ -539,7 +674,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		return True
 		
 		
+	
+	@staticmethod
+	def forceToggled(checkB,self):
+		''' toggle button changed '''
 		
+		self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)
+		return True
+	
+	
+			
 	@staticmethod
 	def	selection_changed_cb(thumb, self):
 		'''
@@ -619,6 +763,9 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			
 			# display the dialog asking what to do and then hide it when we
 			# get the answer
+			tBuff = self.changeDetails.get_buffer()
+			tBuff.set_text(self.show_changes())
+			
 			self.result = self.isChangedDialog.run()
 			self.isChangedDialog.hide()
 
@@ -659,14 +806,9 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
 		else:
 			if self.Debug:
-				print 'no meta to load!'
+				print 'no metadata to load!'
 				self.showImages()
 			return False
-		
-		# freshly set comboboxes, disable commit and revert
-		#self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
-		#self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
-		#self.metaChanged = False
 
 		# return False to let any other callbacks execute as well
 		return False
@@ -697,11 +839,12 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		newTitles = self.loadTitles()	
 		newDates = self.loadDates()			
 		newCaptions = self.loadCaptions()
-		if len(newCaptions) == 0:
-			newCaptions.append('n/a')
 		newKeywords = self.loadKeywords()
-		if len(newKeywords) == 0:
-			newKeywords.append('n/a')
+		if self.forceDefaults.get_active():
+			if len(newCaptions) == 0 or newCaptions[0] == '':
+				newCaptions.append('N/A')		
+			if len(newKeywords) == 0:
+				newKeywords.append('N/A')
 
 		for CB in self.combos:
 			self.clearCombo(CB)
@@ -713,10 +856,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		self.newKeywordEntry.set_text('')		
 		
 		# and finally set the new values and make them active
-		
-		
-			
-		
+	
 		# validate the date string in the file.  if it is bad, set it to today.
 		try:
 			saveDate = newDates[0]
@@ -744,20 +884,22 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.newDate.append_text(t)
 			except:
 				self.newDate.append_text(t[0])
+				
 		self.newDate.set_active(0)
 
-		newTitles.insert(0,newisoDate)
-		
-		for t in newTitles:
-			try:
-				self.newTitle.append_text(t)
-			except:
+		if self.forceDefaults.get_active():
+			if len(newTitles) == 0:
+				newTitles.insert(0,newisoDate)
+			else:
+				if not newTitles[0].startswith(newisoDate):
+					newTitles[0] = newisoDate+' - '+newTitles[0]
+			
+			for t in newTitles:
 				try:
-					self.newTitle.append_text(t[0])
-				except KeyError:
-					self.newTitle.append_text(t['x-default'])
+					self.newTitle.append_text(t)
 				except:
 					print 'error:',sys.exc_info()
+					
 		self.newTitle.set_active(0)
 		
 		
@@ -773,6 +915,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 					self.newCaption.append_text(c['x-default'])
 				except:
 					print 'error:',sys.exc_info()
+					
 		self.newCaption.set_active(0)	
 		
 		for k in newKeywords:  
@@ -780,6 +923,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 				self.newKeyword.append_text(k)
 			except:
 				self.newKeyword.append_text(k[0])
+				
 		self.newKeyword.set_active(0)
 		
 		# check to see if the commit/revert buttons should be active (any changes needed?)
@@ -841,33 +985,36 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	def	checkInitial(self,saveVars,remVars,newValue):
 		''' check to see if the file needs a commit '''
 	
-		for k in saveVars:
-				if k in self.all_keys:
-					if type(self.metadata[k].raw_value) == str:
-						if self.metadata[k].raw_value != newValue:
-							if self.Debug:
-								print k,'(s)[',self.metadata[k].raw_value,']!=[',newValue,']'
-							return True
-					elif type(self.metadata[k].raw_value) == list:
-						if ', '.join(self.metadata[k].raw_value) != newValue:
-							if self.Debug:
-								print k,'(l)[',','.join(self.metadata[k].raw_value),']!=[',newValue,']'
-							return True
+		if self.forceDefaults.get_active():
+			for k in saveVars:
+					if k in self.all_keys:
+						if type(self.metadata[k].raw_value) == str:
+							if self.metadata[k].raw_value != newValue:
+								if self.Debug:
+									print k,'(s)[',self.metadata[k].raw_value,']!=[',newValue,']'
+								return True
+						elif type(self.metadata[k].raw_value) == list:
+							if ', '.join(self.metadata[k].raw_value) != newValue:
+								if self.Debug:
+									print k,'(l)[',','.join(self.metadata[k].raw_value),']!=[',newValue,']'
+								return True
+						else:
+							if self.metadata[k].raw_value['x-default'] != newValue:
+								if self.Debug:
+									print k,'(d)[',self.metadata[k].raw_value['x-default'],']!=[',newValue,']'
+								return True							
 					else:
-						if self.metadata[k].raw_value['x-default'] != newValue:
-							if self.Debug:
-								print k,'(d)[',self.metadata[k].raw_value['x-default'],']!=[',newValue,']'
-							return True							
-				else:
+						if self.Debug:
+							print k,' non-existent'
+						return True
+			for k in remVars:
+				if k in self.all_keys:
 					if self.Debug:
-						print k,' non-existent'
+						print k,' exists'
 					return True
-		for k in remVars:
-			if k in self.all_keys:
-				if self.Debug:
-					print k,' exists'
-				return True
-		return False
+			return False
+		else:
+			return False
 
 
 			
@@ -891,7 +1038,12 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		for k in self.TIvars+self.TIrem:
 			if k in self.all_keys:
 				if self.metadata[k].raw_value not in myTitles:
-					myTitles.append(self.metadata[k].raw_value)
+					try:
+						myTitles.append(self.metadata[k].raw_value[0])
+					except KeyError:
+						myTitles.append(self.metadata[k].raw_value['x-default'])
+					except:
+						myTitles.append(self.metadata[k].raw_value)
 		return myTitles
 	
 	
@@ -902,8 +1054,9 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		myCaptions=[]		
 		for k in self.CAvars+self.CArem:
 			if k in self.all_keys:
-				if self.metadata[k].raw_value not in myCaptions:
-					myCaptions.append(self.metadata[k].raw_value)				   
+				if self.metadata[k].raw_value.strip('\00') not in myCaptions:
+					if len(self.metadata[k].raw_value.strip('\00')) > 0: 
+						myCaptions.append(self.metadata[k].raw_value.strip('\00'))				   
 		return myCaptions
 	
 	
