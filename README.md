@@ -10,9 +10,9 @@ The eogMetaEdit form modifies the following metadata:
 
 <table>
 	<tr>
-		<td>Title</td><td>Exif.Application2.Headline, Xmp.dc.title 
-		NOTE: The title will be prefixed by Iptc.Application2.DateCreated to 
-		allow for sorting on Zenfolio of images with dates prior to 1914.</td>
+		<td>Title</td><td>Exif.Application2.Headline, Exif.Image.ImageDescription, 
+		Xmp.dc.title NOTE: The title will be prefixed by Iptc.Application2.DateCreated 
+		to allow for sorting on Zenfolio of images with dates prior to 1914.</td>
 	</tr>
 	<tr>
 		<td>Date</td><td>Exif.Photo.DateTimeOriginal, Exif.Image.DateTimeOriginal, 
@@ -20,7 +20,7 @@ The eogMetaEdit form modifies the following metadata:
 		Iptc.Application2.TimeCreated</td>
 	</tr>
 	<tr>
-		<td>Caption</td><td>Exif.Image.ImageDescription, Iptc.Application2.Caption, 
+		<td>Caption</td><td>Exif.Photo.UserComment,	Iptc.Application2.Caption, 
 		Xmp.dc.description</td>
 	</tr>
 	<tr>
