@@ -382,7 +382,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		
 		saveTitle = self.newTitle.get_active_text()
 		saveDate = self.newDate.get_active_text()
-		
+		newisoDate = ''
 		for t in self.vDates:
 			try:
 				# I already test for validity on focus-out-event
@@ -405,13 +405,24 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			
 		changeString = ''
 		
-		if self.EXvars[0] not in self.all_keys or \
-					len(self.metadata[self.EXvars[0]].raw_value) == 0:
-			changeString += '\n   set %s to "%s"'%(self.EXvars[0],self.Make)
-			
-		if self.EXvars[1] not in self.all_keys or \
-					len(self.metadata[self.EXvars[1]].raw_value) == 0:
-			changeString += '\n   set %s to "%s"'%(self.Exvars[1],self.Make+' '+self.Model)	
+		try:
+			if self.EXvars[0] not in self.all_keys:			
+				changeString += '\n   add %s to "%s"'%(self.EXvars[0],self.Make)
+			elif len(self.metadata[self.EXvars[0]].raw_value) == 0:
+				changeString += '\n   set %s to "%s"'%(self.EXvars[0],self.Make)
+		except:
+			print 'cs1 error: ',sys.exc_info()
+			return changeString
+		
+		try:
+			if self.EXvars[1] not in self.all_keys:
+				changeString += '\n   add %s to "%s"'%(self.EXvars[1],self.Make+' '+self.Model)
+			elif 	len(self.metadata[self.EXvars[1]].raw_value) == 0:
+				changeString += '\n   set %s to "%s"'%(self.EXvars[1],self.Make+' '+self.Model)
+		except:
+			print 'cs2 error: ',sys.exc_info()
+			return changeString
+	
 		
 		# title variables
 		for k in self.TIvars:
@@ -682,7 +693,24 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	def forceToggled(checkB,self):
 		''' toggle button changed '''
 		
-		self.loadMeta(urlparse(self.changedImage.get_uri_for_display()).path)
+		try:
+			self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
+		except:
+			#print 'loadMeta failed (%s)'%urlparse(self.thumbImage.get_uri_for_display()).path
+			#self.showImages()
+			# if you try to toggle the checkbox when an invalid file is selected you
+			# should error out here
+			for C in self.combos:
+				self.clearCombo(C)
+				
+			self.newTitleEntry.set_text('')
+			self.newDateEntry.set_text('')
+			self.newCaptionEntry.set_text('')
+			self.newKeywordEntry.set_text('')	
+			self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+			self.metaChanged = False
+
 		return True
 	
 	
@@ -806,7 +834,22 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			if self.Debug:
 				print 'loading thumb meta:',\
 					urlparse(self.thumbImage.get_uri_for_display()).path
-			self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
+			try:
+				self.loadMeta(urlparse(self.thumbImage.get_uri_for_display()).path)
+			except:
+				#print 'loadMeta failed (%s)'%urlparse(self.thumbImage.get_uri_for_display()).path
+				#self.showImages()
+				# if you select an invalid file you should error out here
+				for C in self.combos:
+					self.clearCombo(C)
+					
+				self.newTitleEntry.set_text('')
+				self.newDateEntry.set_text('')
+				self.newCaptionEntry.set_text('')
+				self.newKeywordEntry.set_text('')	
+				self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+				self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+				self.metaChanged = False
 		else:
 			if self.Debug:
 				print 'no metadata to load!'
@@ -832,10 +875,18 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	def loadMeta(self, filePath):
 		'''set the comboboxes to the current files data'''
 		
+		
+		self.commitButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.revertButton.set_state(Gtk.StateType.INSENSITIVE)
+		self.metaChanged = False
+		
 		self.fileName.set_label(basename(filePath))
 		
 		self.metadata = pyexiv2.ImageMetadata(filePath)
-		self.metadata.read()		
+		
+		self.metadata.read()	
+		
+			
 		self.all_keys = self.metadata.exif_keys+self.metadata.iptc_keys+\
 			self.metadata.xmp_keys
 		
@@ -961,10 +1012,11 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 		saveKeyword = self.newKeyword.get_active_text()
 		
 		need_commit = self.checkInitial(self.TIvars,self.TIrem,saveTitle)
-		for k in self.EXvars:
-			if k not in self.all_keys:
-				need_commit = True
-				break
+		if self.forceDefaults.get_active():
+			for k in self.EXvars:
+				if k not in self.all_keys:
+					need_commit = True
+					break
 		if not need_commit:
 			need_commit = self.checkInitial(self.DTvars,self.DTrem,saveDate)
 		if not need_commit:
