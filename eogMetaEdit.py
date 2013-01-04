@@ -70,7 +70,7 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 	# 
 	
 	Make = 'eogMetaEdit'
-	Model = 'v0.3b'
+	Model = 'v0.7b'
 	
 	EXvars = [	'Exif.Image.Make',
 				'Exif.Image.Model' ]
@@ -499,16 +499,16 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			if k not in self.all_keys:
 				changeString += '\n   add %s  = "%s"'%(k,saveCaption)
 			else:
-				v=self.metadata[k].raw_value
-				if type(v) == str and v != saveCaption:
-					changeString += '\nupdate1 %s \n\tfrom "%s" \n\t  to "%s"'%\
+				v=""
+				if type(self.metadata[k].raw_value) == str:
+					v=self.metadata[k].raw_value.strip('\00')
+				elif type(self.metadata[k].raw_value) == list:
+					v=self.metadata[k].raw_value[0].strip('\00')
+				else:
+					v=self.metadata[k].raw_value['x-default'].strip('\00')
+				if v != saveCaption:
+					changeString += '\nupdate %s \n\t from "%s" \n\t  to "%s"'%\
 						(k,v,saveCaption)
-				elif type(v) == list and v[0] != saveCaption:
-					changeString += '\nupdate2 %s \n\tfrom "%s" \n\t  to "%s"'%\
-						(k,v[0],saveCaption)
-				elif type(v) == dict and v['x-default'] != saveCaption: 
-					changeString += '\nupdate3 %s \n\tfrom "%s" \n\t  to "%s"'%\
-						(k,v['x-default'],saveCaption)
 			
 		for k in self.CArem:
 			if k in self.all_keys:
@@ -522,13 +522,13 @@ class MetaEditPlugin(GObject.Object, Eog.WindowActivatable):
 			else:
 				v=self.metadata[k].raw_value
 				if type(v) == str and v != newKW:
-					changeString += '\nupdate4 %s \n\tfrom "%s" \n\t  to "%s"'%\
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
 						(k,v,newKW)
 				elif type(v) == list and v != newKW:
-					changeString += '\nupdate5 %s \n\tfrom "%s" \n\t  to "%s"'%\
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
 						(k,v,newKW)
 				elif type(v) == dict and v['x-default'] != newKW: 
-					changeString += '\nupdate6 %s \n\tfrom "%s" \n\t  to "%s"'%\
+					changeString += '\nupdate %s \n\tfrom "%s" \n\t  to "%s"'%\
 						(k,v['x-default'],newKW)	
 			
 		for k in self.KWrem:
